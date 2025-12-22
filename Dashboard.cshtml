@@ -1,0 +1,69 @@
+﻿@*
+    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
+*@
+@model Students_Portal_App.ViewModels.StudentsIndexViewModel
+@{
+    ViewData["Title"] = "Students Dashboard";
+}
+<h4>Students Status</h4>
+<ul>
+    <li>Total : @Model.Summary.TotalStudents</li>
+    <li>Active : @Model.Summary.ActiveStudents</li>
+    <li>Inactive : @Model.Summary.InactiveStudents</li>
+</ul>
+<hr/>
+
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Student Status</th>
+            <th>Student ID</th>
+            <th>Student Name</th>
+            <th>Department</th>
+            <th>In Time</th>
+            <th>Out Time</th>
+            <th>Last Present</th>
+            <th>Photo</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var student in Model.Students)
+        {
+            <tr>
+                <td>
+                    @if (student.StudentStatus == "Active")
+                    {
+                        <span class="badge bg-success">Active</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-danger">Inactive</span>
+                    }
+                </td>
+                <td>@student.StudentId</td>
+                <td>@student.StudentName</td>
+                <td>@student.Department</td>
+                <td>@student.InTime</td>
+                <td>@student.OutTime</td>
+                <td>@student.LastPresent_New</td>
+                <td>
+                    @if (!string.IsNullOrEmpty(student.PhotoPath))
+                    {
+                        <img src="@student.PhotoPath" width="60" height="60"
+                             class="rounded-circle" />
+                        <br />
+                        <a asp-action="ViewPhoto"
+                           asp-route-id="@student.StudentId">
+                            View
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="text-muted">No Photo</span>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+

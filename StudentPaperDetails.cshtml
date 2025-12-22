@@ -1,0 +1,34 @@
+﻿@*
+    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
+*@
+@model IEnumerable<Students_Portal_App.DTOs.StudentsPaperJoinedDto>
+
+<h2>Student – Paper Details</h2>
+
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Student Id</th>
+            <th>Name</th>
+            <th>Register Number</th>
+            <th>Paper Id</th>
+            <th>Paper Code</th>
+            <th>Paper Title</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var x in Model)
+        {
+            <tr>
+                <td>@x.StudentId</td>
+                <td>@x.StudentName</td>
+                <td>@x.RegisterNumber</td>
+                <td>@x.PaperId</td>
+                <td>@x.PaperCode</td>
+                <td>@x.PaperTitle</td>
+                <td>@x.PaperDescription</td>
+            </tr>
+        }
+    </tbody>
+</table>

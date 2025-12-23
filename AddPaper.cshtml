@@ -1,0 +1,38 @@
+﻿@model Students_Portal_App.ViewModels.AddPaperViewModel
+
+<h3>Add Paper</h3>
+
+<form asp-controller="Student" asp-action="AddPaper" method="post">
+    @Html.AntiForgeryToken()
+
+    <!-- Register Number -->
+    <div class="mb-3">
+        <label asp-for="RegisterNumber" class="form-label"></label>
+        <input asp-for="RegisterNumber" class="form-control" />
+        <span asp-validation-for="RegisterNumber" class="text-danger"></span>
+    </div>
+
+    <!-- Paper Code -->
+    <div class="mb-3">
+        <label asp-for="PaperCode" class="form-label"></label>
+        <input asp-for="PaperCode" class="form-control" />
+        <span asp-validation-for="PaperCode" class="text-danger"></span>
+    </div>
+
+    <!-- Paper Title -->
+    <div class="mb-3">
+        <label asp-for="PaperTitle" class="form-label"></label>
+        <input asp-for="PaperTitle" class="form-control" />
+        <span asp-validation-for="PaperTitle" class="text-danger"></span>
+    </div>
+
+    <!-- Paper Description -->
+    <div class="mb-3">
+        <label asp-for="PaperDescription" class="form-label"></label>
+        <textarea asp-for="PaperDescription" class="form-control"></textarea>
+        <span asp-validation-for="PaperDescription" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-action="ViewPaper" class="btn btn-secondary">Back</a>
+</form>

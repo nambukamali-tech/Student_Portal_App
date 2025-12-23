@@ -1,0 +1,41 @@
+﻿@model Students_Portal_App.ViewModels.SearchStudentsPaperViewModel
+
+<h3>Search Student Papers</h3>
+
+<form method="post">
+    <div class="mb-3">
+        <label asp-for="RegisterNumber"></label>
+        <input asp-for="RegisterNumber" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="StudentName"></label>
+        <input asp-for="StudentName" class="form-control" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Search</button>
+</form>
+
+<hr />
+
+@if (Model.Student != null)
+{
+    <h4>@Model.Student.StudentName (@Model.Student.RegisterNumber)</h4>
+
+    @if (Model.StudentsPapers.Any())
+    {
+        <ul>
+            @foreach (var paper in Model.StudentsPapers)
+            {
+                <li>
+                    <strong>@paper.PaperTitle</strong>
+                    (@paper.PaperCode)
+                </li>
+            }
+        </ul>
+    }
+    else
+    {
+        <p>No papers found for this student.</p>
+    }
+}

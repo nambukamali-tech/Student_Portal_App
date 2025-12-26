@@ -12,26 +12,27 @@ namespace Students_Portal_App.Services
     {
 
         private readonly ApplicationDbContext _context;//Make the instance of ApplicationDbContext with readonly field
-        private readonly IWebHostEnvironment _webHostEnvironment;
-
+        private readonly IWebHostEnvironment _webHostEnvironment;//Essential to web root path for save the images
+        //constructor to initialize the ApplicationDbContext instance using Dependency Injection
         public StudentInformationsServices(ApplicationDbContext context, IWebHostEnvironment webHostEnvironment)
         {
             _context = context;
-            _webHostEnvironment = webHostEnvironment;
+            _webHostEnvironment = webHostEnvironment;//Dependency Injection for WebHostEnvironment to access wwwroot folder
         }
 
         public async Task<List<StudentsPortalInfos>> GetStudentsPortalInfosAsync()//Get Students Service
         {
             return await _context.StudentsPortalInfos.ToListAsync();
         }
-        //Add Students Service (business logic)
+        //Add Students Service (business logic) for student portal
         public async Task<StudentsPortalInfos> AddStudentsPortalInfosAsync(StudentsPortalInfos studentsPortalInfos)
         {
             _context.StudentsPortalInfos.Add(studentsPortalInfos);
             await _context.SaveChangesAsync();
             return studentsPortalInfos;
-            
+
         }
+
         //Update Students Service (business logic)
         public async Task UpdateStudentsPortalInfosAsync(StudentsPortalInfos studentsPortalInfos)
         {
@@ -43,14 +44,10 @@ namespace Students_Portal_App.Services
                 existingStudent.Department = studentsPortalInfos.Department;
                 existingStudent.InTime = studentsPortalInfos.InTime;
                 existingStudent.OutTime = studentsPortalInfos.OutTime;
-                existingStudent.LastPresent_New = studentsPortalInfos.LastPresent_New;
-                existingStudent.Actions = studentsPortalInfos.Actions;
                 await _context.SaveChangesAsync();
-
             }
-
-
         }
+
         //Delete Students Service (business logic)
         public async Task DeleteStudentsPortalInfosAsync(int studentId)
         {
@@ -62,9 +59,8 @@ namespace Students_Portal_App.Services
                 _context.StudentsPortalInfos.Remove(student);
                 await _context.SaveChangesAsync();
             }
-
         }
-        //
+
         //Dashboard Service using DTOs and ViewModel with LINQ
         public async Task<StudentsIndexViewModel> GetStudentsDashboardAsync()
         {
@@ -78,8 +74,9 @@ namespace Students_Portal_App.Services
             };
 
             var students = await query
-                .OrderBy(s => s.StudentName)
-                .Select(static s => new StudentsListDtos
+                //here using Linq to query data from database using orderby and select 
+                .OrderBy(s => s.StudentName)//Using Orderby to sort the students by name
+                .Select(static s => new StudentsListDtos//selssect specific fields using dtos
                 {
                     StudentId = s.StudentId,
                     StudentStatus = s.StudentStatus,
@@ -87,7 +84,6 @@ namespace Students_Portal_App.Services
                     Department = s.Department,
                     InTime = s.InTime,
                     OutTime = s.OutTime,
-                    LastPresent_New = s.LastPresent_New,
                     PhotoPath = s.PhotoPath
                 })
                 .ToListAsync();
@@ -97,6 +93,8 @@ namespace Students_Portal_App.Services
                 Students = students
             };
         }
+
+        //Upload Student Photo Service
         public async Task UploadStudentPhotoAsync(int studentId, IFormFile photo)
         {
             var student = await _context.StudentsPortalInfos.FindAsync(studentId);
@@ -124,18 +122,78 @@ namespace Students_Portal_App.Services
             await _context.SaveChangesAsync();
         }
 
-
-       
-
+        //View Student by Id Service
         public async Task<StudentsPortalInfos?> GetStudentByIdAsync(int studentId)
         {
             return await _context.StudentsPortalInfos
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.StudentId == studentId);
         }
+      
+        //Add details to paper
+        public async Task<StudentsPaper> AddPaperAsync(StudentsPaper studentsPaper)
+        {
+            await _context.StudentsPapers.AddAsync(studentsPaper);
+            await _context.SaveChangesAsync();
+            return studentsPaper;
+        }
+
+        //show the joining tables with combined student and papers table
+        [HttpGet]
+        public async Task<List<StudentsPaper>> GetStudentswithPapersAsync()
+        {
+            return await _context.StudentsPapers
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        //Get Papers + Students Details
+        public async Task<List<StudentsPaperdtos>> GetStudentsWithPapersAsync(int page, int pageSize)
+        {
+            return await (
+                from s in _context.StudentsPortalInfos
+                join p in _context.StudentsPapers
+                    on s.StudentId equals p.StudentId
+                orderby s.StudentName
+                select new StudentsPaperdtos
+                {
+                    StudentId = s.StudentId,
+                    StudentName = s.StudentName!,
+                    RegisterNumber = s.RegisterNumber!,
+                    Department = s.Department!,
+                    PaperId = p.PaperId,
+                    PaperCode = p.PaperCode!,
+                    PaperTitle = p.PaperTitle!,
+                    PaperDescription = p.PaperDescription!
+                }
+            )
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .AsNoTracking()
+            .ToListAsync();
+        }
+
+        public async Task<int> GetStudentsWithPaperCountAsync()
+        {
+            return await (
+                from s in _context.StudentsPortalInfos
+                join p in _context.StudentsPapers
+                    on s.StudentId equals p.StudentId
+                select p.PaperId
+            ).CountAsync();
+        }
 
 
+        public Task<List<StudentsPaper>> GetStudentsPapersAsync()
+        {
+            throw new NotImplementedException();
+        }
 
-
+        public Task<List<StudentsPaperdtos>> GetStudentsWithPapersAsync()
+        {
+            throw new NotImplementedException();
+        }
     }
+
 }
+

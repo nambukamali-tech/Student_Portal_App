@@ -1,0 +1,84 @@
+﻿@model Students_Portal_App.Models.Entities.StudentsPortalInfos
+
+<h2>Add Student</h2>
+
+<form asp-action="AddStudent" method="post">
+    @Html.AntiForgeryToken()
+
+    <div class="mb-3">
+        <label asp-for="StudentStatus"></label>
+        <div class="form-check">
+        <input class="form-check-input" type="radio" asp-for="StudentStatus" value="Active"/>
+       <label class="form-check-label">Active</label>
+        </div>
+
+        <div class="form-check">
+            <input class="form-check-input" type="radio" asp-for="StudentStatus" value="Inactive"/>
+            <label class="form-check-label">Inactive</label>
+        </div>
+    </div>
+    <div class="mb-3">
+        <label asp-for="RegisterNumber"></label>
+        <input asp-for="RegisterNumber" class="form-control" />
+        <span asp-validation-for="RegisterNumber" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="StudentName"></label>
+        <input asp-for="StudentName" class="form-control" />
+        <span asp-validation-for="StudentName" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Department" class="form-label fw-bold"></label>
+
+        <select asp-for="Department" class="form-select">
+            <option value="">Select Course</option>
+
+            <optgroup label="UG Courses">
+                <option value="BSc">BSc Computer Science</option>
+                <option value="BSc">BSc Mathematics</option>
+                <option value="BSc">BSc Chemistry</option>
+                <option value="BSc">BSc Physics</option>
+                <option value="BCA">BCA</option>
+                <option value="BCom">BCom</option>
+                <option value="BA">BA Tamil</option>
+                <option value="BA">BA English</option>
+            </optgroup>
+
+            <optgroup label="PG Courses">
+                <option value="MSc">MSc Computer Science</option>
+                <option value="MCA">MCA</option>
+                <option value="MCom">MCom</option>
+                <option value="MA">MA</option>
+            </optgroup>
+
+            <optgroup label="PhD Courses">
+                <option value="PhD CS">PhD Computer Science</option>
+                <option value="PhD Math">PhD Mathematics</option>
+                <option value="PhD Physics">PhD Physics</option>
+            </optgroup>
+        </select>
+
+        <span asp-validation-for="Department" class="text-danger"></span>
+    </div>
+
+
+    <div class="mb-3">
+        <label asp-for="InTime"></label>
+        <input asp-for="InTime" type="datetime-local" class="form-control" />
+        <span asp-validation-for="InTime" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="OutTime"></label>
+        <input asp-for="OutTime" type="datetime-local" class="form-control" />
+        <span asp-validation-for="OutTime" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-success">Save</button>
+    <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

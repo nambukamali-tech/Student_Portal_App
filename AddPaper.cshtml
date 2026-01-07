@@ -1,38 +1,52 @@
 ﻿@model Students_Portal_App.ViewModels.AddPaperViewModel
 
-<h3>Add Paper</h3>
+<h3>Add Paper Department Wise</h3>
 
-<form asp-controller="Student" asp-action="AddPaper" method="post">
-    @Html.AntiForgeryToken()
+<form method="post" asp-action="AddPaper" asp-controller="Student">
 
-    <!-- Register Number -->
-    <div class="mb-3">
-        <label asp-for="RegisterNumber" class="form-label"></label>
-        <input asp-for="RegisterNumber" class="form-control" />
-        <span asp-validation-for="RegisterNumber" class="text-danger"></span>
-    </div>
-
-    <!-- Paper Code -->
-    <div class="mb-3">
-        <label asp-for="PaperCode" class="form-label"></label>
+    <div class="form-group">
+        <label>Paper Code</label>
         <input asp-for="PaperCode" class="form-control" />
         <span asp-validation-for="PaperCode" class="text-danger"></span>
     </div>
 
-    <!-- Paper Title -->
-    <div class="mb-3">
-        <label asp-for="PaperTitle" class="form-label"></label>
+    <div class="form-group">
+        <label>Paper Title</label>
         <input asp-for="PaperTitle" class="form-control" />
         <span asp-validation-for="PaperTitle" class="text-danger"></span>
     </div>
 
-    <!-- Paper Description -->
-    <div class="mb-3">
-        <label asp-for="PaperDescription" class="form-label"></label>
-        <textarea asp-for="PaperDescription" class="form-control"></textarea>
-        <span asp-validation-for="PaperDescription" class="text-danger"></span>
+    <div class="form-group">
+        <label>Department Name</label>
+        <select asp-for="DepartmentId" class="form-control">
+            <option value="">Select Departments</option>
+        <optgroup label="Departments">
+            <option value="1">Tamil</option>
+            <option value="2">English</option>
+            <option value="3">Maths</option>
+            <option value="4">Chemistry</option>
+            <option value="5">Physics</option>
+        </optgroup>
+        </select>
     </div>
 
-    <button type="submit" class="btn btn-primary">Save</button>
-    <a asp-action="ViewPaper" class="btn btn-secondary">Back</a>
+    <div class="form-group">
+        <label>Course Name</label>
+        <input asp-for="courseName" class="form-control" />
+        <span asp-validation-for="courseName" class="text-danger"></span>
+    </div>
+
+    <div class="form-group">
+        <label>Paper Description</label>
+        <textarea asp-for="PaperDescription" class="form-control"></textarea>
+        <span asp-validation-for="PaperDescription" class="text-danger"></span>
+    </div>   
+
+    <button type="submit" class="btn btn-primary mt-2">Save Paper</button>
+    <asp action="ViewPaper" />
 </form>
+
+@section Scripts 
+{
+    <partial name="_ValidationScriptsPartial" />
+}

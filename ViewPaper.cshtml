@@ -1,11 +1,11 @@
-﻿@model IEnumerable<Students_Portal_App.Models.Entities.StudentsPaper>
+﻿@model IEnumerable<Students_Portal_App.Models.Entities.DepartmentPapers>
 
 <h2>All Papers</h2>
 
 <table class="table table-bordered">
     <thead>
         <tr>
-            <th>Student Id</th>
+            
             <th>Paper Id</th>
             <th>Paper Code</th>
             <th>Paper Title</th>
@@ -15,8 +15,7 @@
     <tbody>
         @foreach (var p in Model)
         {
-            <tr>
-                <td>@p.StudentId</td>
+            <tr>                
                 <td>@p.PaperId</td>
                 <td>@p.PaperCode</td>
                 <td>@p.PaperTitle</td>

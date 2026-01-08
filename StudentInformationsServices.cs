@@ -76,14 +76,14 @@ namespace Students_Portal_App.Services
             };
 
             var students = await query
-                //here using Linq to query data from database using orderby and select 
+                //using Linq to query data from database using orderby and select 
                 .OrderBy(s => s.StudentName)//Using Orderby to sort the students by name
-                .Select(static s => new StudentsListDtos//selssect specific fields using dtos
+                .Select(static s => new StudentsListDtos//select specific fields using dtos
                 {
                     StudentId = s.StudentId,
                     StudentStatus = s.StudentStatus,
                     StudentName = s.StudentName,
-                    Department = s.Department,
+                    Department = s.Department.DepartmentName,
                     InTime = s.InTime,
                     OutTime = s.OutTime,
                     PhotoPath = s.PhotoPath
@@ -131,20 +131,49 @@ namespace Students_Portal_App.Services
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.StudentId == studentId);
         }
-      
-        //Add details to paper
-        public async Task<StudentsPaper> AddPaperAsync(StudentsPaper studentsPaper)
+
+        //Just to solve the error
+        public async Task<List<DepartmentPapers>> GetStudentsPapersAsync()
         {
-            await _context.StudentsPapers.AddAsync(studentsPaper);
+            // Fetch all papers from the database
+            return await _context.DepartmentPapers
+                .Include(p => p.Department) // optional: include department details
+                .ToListAsync();
+        }
+
+        //Add details to paper
+        public async Task<DepartmentPapers> AddPaperAsync(DepartmentPapers studentsPaper)
+        {
+            await _context.DepartmentPapers.AddAsync(studentsPaper);
             await _context.SaveChangesAsync();
             return studentsPaper;
         }
 
+        //View details of Department papers
+        public async Task<List<DepartmentPapersdtos>> GetDepartmentPapersAsync()
+        {
+
+            return await _context.DepartmentPapers //Its Db Name incluse the Department Db
+                .Include(p => p.Department)
+                .Select(p => new DepartmentPapersdtos//Take datas from DepartmentPapersdtos also
+                {
+                    PaperId = p.PaperId,
+                    PaperCode = p.PaperCode,
+                    PaperDescription = p.PaperDescription,
+                    DepartmentId = p.DepartmentId,
+                    DepartmentName = p.Department.DepartmentName,
+                    CourseName = p.CourseName
+
+                })
+                .ToListAsync();
+
+        }
+
         //show the joining tables with combined student and papers table
         [HttpGet]
-        public async Task<List<StudentsPaper>> GetStudentswithPapersAsync()
+        public async Task<List<DepartmentPapers>> GetStudentswithPapersAsync()
         {
-            return await _context.StudentsPapers
+            return await _context.DepartmentPapers
                 .AsNoTracking()
                 .ToListAsync();
         }
@@ -154,15 +183,15 @@ namespace Students_Portal_App.Services
         {
             return await (
                 from s in _context.StudentsPortalInfos
-                join p in _context.StudentsPapers
-                    on s.StudentId equals p.StudentId
+                join p in _context.DepartmentPapers
+                    on s.DepartmentId equals p.DepartmentId
                 orderby s.StudentName
                 select new StudentsPaperdtos
                 {
                     StudentId = s.StudentId,
                     StudentName = s.StudentName!,
                     RegisterNumber = s.RegisterNumber!,
-                    Department = s.Department!,
+                    Department = s.Department.DepartmentName!,//Error for department field because of string variable
                     PaperId = p.PaperId,
                     PaperCode = p.PaperCode!,
                     PaperTitle = p.PaperTitle!,
@@ -179,8 +208,8 @@ namespace Students_Portal_App.Services
         {
             return await (
                 from s in _context.StudentsPortalInfos
-                join p in _context.StudentsPapers
-                    on s.StudentId equals p.StudentId
+                join p in _context.DepartmentPapers
+                    on s.DepartmentId equals p.DepartmentId
                 select p.PaperId
             ).CountAsync();
         }
@@ -227,17 +256,64 @@ namespace Students_Portal_App.Services
                     Status = sch.Status
                 }
             ).AsNoTracking().ToListAsync();
-        }
-
-
-
-
-        public Task<List<StudentsPaper>> GetStudentsPapersAsync()
+        }   
+        Task<List<VwStudentsportal>> IStudentInformationsServices.GetDataView()
         {
             throw new NotImplementedException();
         }
 
-        public Task<List<StudentsPaperdtos>> GetStudentsWithPapersAsync()
+        Task<List<VwStudentsportal>> IStudentInformationsServices.GetDatas()
+        {
+            throw new NotImplementedException();
+        }
+
+        Task<List<StudentScholarshipdtos>> IStudentInformationsServices.GetAllScholarshipsAsync()
+        {
+            throw new NotImplementedException();
+        }
+
+        Task IStudentInformationsServices.AddScholarshipUsingSP(AddScholarshipViewModel model)
+        {
+            throw new NotImplementedException();
+        }
+
+        Task<List<DepartmentPapers>> IStudentInformationsServices.GetStudentsPapersAsync()
+        {
+            throw new NotImplementedException();
+        }
+
+        Task<StudentsPortalInfos> IStudentInformationsServices.AddStudentsPortalInfosAsync(StudentsPortalInfos studentsPortalInfos)
+        {
+            throw new NotImplementedException();
+        }
+
+        Task IStudentInformationsServices.UpdateStudentsPortalInfosAsync(StudentsPortalInfos studentsPortalInfos)
+        {
+            throw new NotImplementedException();
+        }
+
+        Task IStudentInformationsServices.DeleteStudentsPortalInfosAsync(int studentId)
+        {
+            throw new NotImplementedException();
+        }
+
+        Task<StudentsPortalInfos?> IStudentInformationsServices.GetStudentByIdAsync(int studentId)
+        {
+            throw new NotImplementedException();
+        }
+
+        Task<StudentsIndexViewModel> IStudentInformationsServices.GetStudentsDashboardAsync()
+        {
+            throw new NotImplementedException();
+        }
+
+        Task IStudentInformationsServices.UploadStudentPhotoAsync(int studentId, IFormFile photo)
+        {
+            throw new NotImplementedException();
+        }
+
+
+        Task<int> IStudentInformationsServices.GetStudentsWithPaperCountAsync()
         {
             throw new NotImplementedException();
         }

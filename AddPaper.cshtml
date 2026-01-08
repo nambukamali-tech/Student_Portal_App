@@ -2,48 +2,61 @@
 
 <h3>Add Paper Department Wise</h3>
 
-<form method="post" asp-action="AddPaper" asp-controller="Student">
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @TempData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<form asp-action="AddPaper" asp-controller="Student" method="post">
 
     <div class="form-group">
-        <label>Paper Code</label>
+        <label asp-for="PaperCode"></label>
         <input asp-for="PaperCode" class="form-control" />
         <span asp-validation-for="PaperCode" class="text-danger"></span>
     </div>
 
     <div class="form-group">
-        <label>Paper Title</label>
+        <label asp-for="PaperTitle"></label>
         <input asp-for="PaperTitle" class="form-control" />
         <span asp-validation-for="PaperTitle" class="text-danger"></span>
     </div>
 
     <div class="form-group">
         <label>Department Name</label>
-        <select asp-for="DepartmentId" class="form-control">
-            <option value="">Select Departments</option>
-        <optgroup label="Departments">
-            <option value="1">Tamil</option>
-            <option value="2">English</option>
-            <option value="3">Maths</option>
-            <option value="4">Chemistry</option>
-            <option value="5">Physics</option>
-        </optgroup>
+        <select asp-for="DepartmentId" asp-items="ViewBag.Departments" class="form-control">
+            <option value="">Select Department</option>
         </select>
+        <span asp-validation-for="DepartmentId" class="text-danger"></span>
+    </div>
+
+
+    <div class="form-group">
+        <label asp-for="CourseName"></label>
+        <input asp-for="CourseName" class="form-control" />
+        <span asp-validation-for="CourseName" class="text-danger"></span>
     </div>
 
     <div class="form-group">
-        <label>Course Name</label>
-        <input asp-for="courseName" class="form-control" />
-        <span asp-validation-for="courseName" class="text-danger"></span>
-    </div>
-
-    <div class="form-group">
-        <label>Paper Description</label>
+        <label asp-for="PaperDescription"></label>
         <textarea asp-for="PaperDescription" class="form-control"></textarea>
         <span asp-validation-for="PaperDescription" class="text-danger"></span>
-    </div>   
+    </div>
 
     <button type="submit" class="btn btn-primary mt-2">Save Paper</button>
-    <asp action="ViewPaper" />
+    <a asp-action="ViewPaper" class="btn btn-secondary mt-2 ms-2">Back</a>  
+
 </form>
 
 @section Scripts 

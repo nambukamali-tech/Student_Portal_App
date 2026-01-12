@@ -11,10 +11,12 @@ namespace Students_Portal_App.Controllers
 {
     public class StudentController : Controller
     {
-        private readonly IStudentInformationsServices _studentsInfoServices;
+        private readonly IStudentInformationsServices _studentsInfoServices;//take method from interface name ie) IStudentInformationsServices
+      //_studentsInfoServices  is a private field of the class
         private readonly IStudentInformationsServices _studentsPaperService;
+        //_studentsPaperService is a private field of the class
         private readonly ApplicationDbContext _context;
-
+        //_context is a private field of the class
 
         public StudentController(IStudentInformationsServices studentsInfoServices, ApplicationDbContext context)
         {
@@ -23,71 +25,126 @@ namespace Students_Portal_App.Controllers
             _context = context;
         }
 
-        //GET : Student
+        // GET : Student
         [HttpGet]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int? departmentId)
         {
-            List<StudentsPortalInfos> studentsInformations = await _studentsInfoServices.GetStudentsPortalInfosAsync();
-            return View(studentsInformations);
+            //  Get ALL students
+            var allStudents = await _studentsInfoServices.GetStudentsPortalInfosAsync();
+
+            // Filter students ONLY for table
+            var filteredStudents = allStudents;
+
+            if (departmentId.HasValue)
+            {
+                filteredStudents = allStudents
+                    .Where(s => s.DepartmentId == departmentId.Value)
+                    .ToList();
+            }
+
+            // ALWAYS get departments from Department table 
+            var departments = await _context.Departments.ToListAsync();
+
+            // circles: one circle per department
+            ViewBag.Departments = departments.Select(d => new
+            {
+                DepartmentId = d.DepartmentId,
+                DepartmentName = d.DepartmentName,
+                StudentCount = allStudents.Count(s => s.DepartmentId == d.DepartmentId)
+            }).ToList();
+
+            //  Send only filtered students to view
+            return View(filteredStudents);
         }
 
-        //Add Students GET:
+        // GET: Add Student
         [HttpGet]
-        public IActionResult AddStudent()
+        public async Task<IActionResult> AddStudent()
         {
+            var departments = await _context.Departments.ToListAsync();
+
+            ViewBag.Departments = new SelectList(
+                departments,
+                "DepartmentId",
+                "DepartmentName"
+            );
+
             return View();
         }
 
+
+        // POST: Add Student
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AddStudent(StudentsPortalInfos model, IFormFile? Photo)
         {
-            // 1️⃣ Validate Model
             if (!ModelState.IsValid)
             {
+                ViewBag.Departments = new SelectList(
+                    await _context.Departments.ToListAsync(),
+                    "DepartmentId",
+                    "DepartmentName",
+                    model.DepartmentId
+                );
+
                 return View(model);
             }
 
-            // 2️⃣ Generate StudentId manually if needed
-            int lastId = await _context.StudentsPortalInfos
-                .OrderByDescending(s => s.StudentId)
-                .Select(s => s.StudentId)
-                .FirstOrDefaultAsync();
 
-            model.StudentId = lastId == 0 ? 1001 : lastId + 1;
-
-            // 3️⃣ Handle photo upload
+            // Handle photo upload
             if (Photo != null && Photo.Length > 0)
             {
-                // Set a folder path, e.g., wwwroot/uploads/students
-                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads/students");
+                if (!Photo.ContentType.StartsWith("image/"))
+                {
+                    ModelState.AddModelError("Photo", "Only image files are allowed.");
+                    ViewBag.Departments = new SelectList(
+                        await _context.Departments.ToListAsync(),
+                        "DepartmentId",
+                        "DepartmentName"
+                    );
+                    return View(model);
+                }
 
-                // Create folder if not exists
+                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads/students");
                 if (!Directory.Exists(uploadsFolder))
                     Directory.CreateDirectory(uploadsFolder);
 
-                // Unique file name
                 var fileName = $"{Guid.NewGuid()}_{Photo.FileName}";
                 var filePath = Path.Combine(uploadsFolder, fileName);
 
-                // Save file
-                using (var stream = new FileStream(filePath, FileMode.Create))
-                {
-                    await Photo.CopyToAsync(stream);
-                }
+                using var stream = new FileStream(filePath, FileMode.Create);
+                await Photo.CopyToAsync(stream);
 
-                // Store relative path in DB
                 model.PhotoPath = $"/uploads/students/{fileName}";
             }
 
-            // 4️⃣ Save using service layer
-            await _studentsInfoServices.AddStudentsPortalInfosAsync(model);
-
-            // 5️⃣ Redirect to index
+             await _studentsInfoServices.AddStudentsPortalInfosAsync(model);
             return RedirectToAction("Index");
         }
 
-        //For Edit and Update operations
+        //For Update Time controller
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateTime(UpdateTimedtos model)//Request receive and response using IActionResult
+        {
+            if (model.StudentId <= 0)
+                return BadRequest("Invalid student ID");
+
+            var student = await _studentsInfoServices.GetStudentByIdAsync(model.StudentId);
+            if (student == null)
+                return NotFound("Student not found");
+
+            student.InTime = model.InTime;
+            student.OutTime = model.OutTime;
+
+            await _studentsInfoServices.UpdateStudentsPortalInfosAsync(student);
+
+            return Ok();//200 response
+        }
+
+
+
+        //For Edit and Update operations of students details
         [HttpGet]
         public async Task<IActionResult> EditStudent(int studentId)
         {
@@ -96,21 +153,76 @@ namespace Students_Portal_App.Controllers
             if (student == null)
                 return NotFound();
 
+            //It automatically gives the department details in dropdown of view page
+            //When user clicks select department itshows the names of departments
+            ViewBag.Departments = new SelectList(
+                await _context.Departments.ToListAsync(),
+                "DepartmentId",
+                "DepartmentName",
+                student.DepartmentId
+            );
+
             return View(student);
         }
 
+
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditStudent(StudentsPortalInfos studentsPortalInfos)
+        public async Task<IActionResult> EditStudent(StudentsPortalInfos model, IFormFile? Photo)
         {
             if (!ModelState.IsValid)
             {
-                return View(studentsPortalInfos);
+                // Populate the departments again so dropdown works on validation error
+                ViewBag.Departments = new SelectList(
+                    await _context.Departments.ToListAsync(),
+                    "DepartmentId",
+                    "DepartmentName",
+                    model.DepartmentId
+                );
+
+                return View(model);
             }
 
-            await _studentsInfoServices.UpdateStudentsPortalInfosAsync(studentsPortalInfos);
+            // Handle photo upload
+            if (Photo != null && Photo.Length > 0)
+            {
+                if (!Photo.ContentType.StartsWith("image/"))
+                {
+                    ModelState.AddModelError("Photo", "Only image files are allowed.");
+                    ViewBag.Departments = new SelectList(
+                        await _context.Departments.ToListAsync(),
+                        "DepartmentId",
+                        "DepartmentName",
+                        model.DepartmentId
+                    );
+                    return View(model);
+                }
+
+                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads/students");
+                if (!Directory.Exists(uploadsFolder))
+                    Directory.CreateDirectory(uploadsFolder);
+
+                var fileName = $"{Guid.NewGuid()}_{Photo.FileName}";
+                var filePath = Path.Combine(uploadsFolder, fileName);
+
+                using var stream = new FileStream(filePath, FileMode.Create);
+                await Photo.CopyToAsync(stream);
+
+                model.PhotoPath = $"/uploads/students/{fileName}";
+            }
+            else
+            {
+                // Keep existing photo if no new photo uploaded
+                var existing = await _studentsInfoServices.GetStudentByIdAsync(model.StudentId);
+                model.PhotoPath = existing?.PhotoPath;
+            }
+
+            // Update student in database
+            await _studentsInfoServices.UpdateStudentsPortalInfosAsync(model);
+
             return RedirectToAction(nameof(Index));
         }
+
 
         //Delete Student
         [HttpGet]
@@ -124,6 +236,7 @@ namespace Students_Portal_App.Controllers
 
             return View(student);
         }
+
         //Delete Post method
 
         [HttpPost, ActionName("DeleteStudent")]
@@ -211,6 +324,7 @@ namespace Students_Portal_App.Controllers
             }
 
             //  safety check 
+
             bool departmentExists = await _context.Departments
                 .AnyAsync(d => d.DepartmentId == model.DepartmentId);
 

@@ -29,11 +29,19 @@ namespace Students_Portal_App.Services
         //Add Students Service (business logic) for student portal
         public async Task<StudentsPortalInfos> AddStudentsPortalInfosAsync(StudentsPortalInfos studentsPortalInfos)
         {
+            // Validate DepartmentId exists
+            var deptExists = await _context.Departments
+                .AnyAsync(d => d.DepartmentId == studentsPortalInfos.DepartmentId);
+
+            if (!deptExists)
+                throw new Exception("Selected Department does not exist.");
+
             _context.StudentsPortalInfos.Add(studentsPortalInfos);
             await _context.SaveChangesAsync();
-            return studentsPortalInfos;
 
+            return studentsPortalInfos;
         }
+
 
         //Update Students Service (business logic)
         public async Task UpdateStudentsPortalInfosAsync(StudentsPortalInfos studentsPortalInfos)
@@ -166,7 +174,6 @@ namespace Students_Portal_App.Services
 
                 })
                 .ToListAsync();
-
         }
 
         //show the joining tables with combined student and papers table
@@ -198,7 +205,7 @@ namespace Students_Portal_App.Services
                     PaperDescription = p.PaperDescription!
                 }
             )
-            .Skip((page - 1) * pageSize)
+            .Skip((page - 1) * pageSize) 
             .Take(pageSize)
             .AsNoTracking()
             .ToListAsync();
@@ -287,20 +294,13 @@ namespace Students_Portal_App.Services
             throw new NotImplementedException();
         }
 
-        Task IStudentInformationsServices.UpdateStudentsPortalInfosAsync(StudentsPortalInfos studentsPortalInfos)
-        {
-            throw new NotImplementedException();
-        }
 
         Task IStudentInformationsServices.DeleteStudentsPortalInfosAsync(int studentId)
         {
             throw new NotImplementedException();
         }
 
-        Task<StudentsPortalInfos?> IStudentInformationsServices.GetStudentByIdAsync(int studentId)
-        {
-            throw new NotImplementedException();
-        }
+        
 
         Task<StudentsIndexViewModel> IStudentInformationsServices.GetStudentsDashboardAsync()
         {

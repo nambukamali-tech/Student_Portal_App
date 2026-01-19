@@ -1,137 +1,115 @@
 ﻿@using Students_Portal_App.Models.Entities;
-
 @model List<StudentsPortalInfos>
 
 @{
-    ViewData["Title"] = "Students Dashboard";//For title
-
-    // Date will be updated to daily 
-    //Before page loads it will store the date of today
+    ViewData["Title"] = "Students Dashboard";
 
     var today = DateTime.Today;
- 
-    //Students intime saved in the variable of studentsToday
-    //Filter the students if intime exists and intime value is today or not
+
+    /* Today Chart */
     var studentsToday = Model
         .Where(s => s.InTime.HasValue && s.InTime.Value.Date == today)
         .ToList();
 
-    var totalToday = studentsToday.Count;
+    var activeTodayList = studentsToday.Where(s => s.StudentStatus == "Active").ToList();
+    var inactiveTodayList = studentsToday.Where(s => s.StudentStatus != "Active").ToList();
 
-    //Seperate Active and Inactive students 
-    var activeTodayList = studentsToday
-        .Where(s => s.StudentStatus == "Active")
-        .ToList();
-    //Count the Today Active Students
     var activeTodayCount = activeTodayList.Count;
-
-    var inactiveTodayList = studentsToday
-        .Where(s => s.StudentStatus != "Active")
-        .ToList();
-     //Count the active and inactive students
     var inactiveTodayCount = inactiveTodayList.Count;
 
-    // Take the current month and year
-    var currentMonth = today.Month;
-    var currentYear = today.Year;
-
-    //Filter the students of current month matches to the year
+    /* Monthly Chart */
     var studentsMonthly = Model
         .Where(s => s.InTime.HasValue &&
-                    s.InTime.Value.Month == currentMonth &&
-                    s.InTime.Value.Year == currentYear)
+                    s.InTime.Value.Month == today.Month &&
+                    s.InTime.Value.Year == today.Year)
         .ToList();
 
-    //Monthly students status
-    //Students total count of month wise
+    var activeMonthlyList = studentsMonthly.Where(s => s.StudentStatus == "Active").ToList();
+    var inactiveMonthlyList = studentsMonthly.Where(s => s.StudentStatus != "Active").ToList();
 
-    var totalMonthly = studentsMonthly.Count;
-    //Monthly active students count
-    var activeMonthlyList = studentsMonthly
-        .Where(s => s.StudentStatus == "Active")//Active
-        .ToList();
     var activeMonthlyCount = activeMonthlyList.Count;
-    //Monthly inactive students count
-    var inactiveMonthlyList = studentsMonthly
-        .Where(s => s.StudentStatus != "Active")//Inactive
-        .ToList();
-    var inactiveMonthlyCount = inactiveMonthlyList.Count;//Count of students
+    var inactiveMonthlyCount = inactiveMonthlyList.Count;
+
+    /* Department Details */
+    var departmentToday = studentsToday
+        .Where(s => s.Department != null)
+        .GroupBy(s => s.Department.DepartmentName)
+        .Select(g => new
+        {
+            Department = g.Key,
+            Count = g.Count(),
+            Students = g.Select(x => x.StudentName).ToList()
+        }).ToList();
+
+    var departmentMonthly = studentsMonthly
+        .Where(s => s.Department != null)
+        .GroupBy(s => s.Department.DepartmentName)
+        .Select(g => new
+        {
+            Department = g.Key,
+            Count = g.Count(),
+            Students = g.Select(x => x.StudentName).ToList()
+        }).ToList();
 }
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<!-- For the info icon -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
 <style>
-    .card-box 
-    {
+    .card-box {
         border-radius: 16px;
         box-shadow: 0 8px 24px rgba(0,0,0,.06);
     }
 
-    .legend-container .d-flex 
-    {
+    .legend-container .d-flex {
         font-size: 14px;
         margin-bottom: 6px;
     }
 
-    .legend-container i 
-    {
+    .legend-container i {
         cursor: pointer;
         color: #6c757d;
     }
 
-    .popover-body 
-    {
+    .popover-body {
         max-height: 150px;
         overflow-y: auto;
-    }
-
-    td img
-    {
-        border-radius: 50%;
-    }
-
-    .action-btn i 
-    {
-        margin-right: 0;
-    }
-
-    .save-message
-    {
-        font-weight: 500;
-        margin-top: 5px;
+        
     }
 </style>
 
-<!-- Radio Buttons for showing the both monthly and currently students status -->
-
+<!-- Radio button for both monthly and daily (Today) -->
 <div class="mb-3">
-    <label class="form-check-label me-3">
-        <input type="radio" name="statusType" value="current" checked class="form-check-input me-1"> Current
+    <label class="me-3">
+        <input type="radio" name="statusType" value="current" checked /> Current
     </label>
-    <label class="form-check-label">
-        <input type="radio" name="statusType" value="monthly" class="form-check-input me-1"> Monthly
+    <label>
+        <input type="radio" name="statusType" value="monthly" /> Monthly
     </label>
 </div>
 
-<!-- Students Status -->
-
+<!-- Charts -->
 <div class="row mb-4">
+    <!-- Status -->
     <div class="col-md-6">
         <div class="card card-box p-4">
-            <h5>Students Status Details</h5>
-            <!--Canvas for creating the dynamic chart so chart.js using the canvas element-->
-
+            <h5>Students Status</h5>
             <canvas id="studentsStatusChart" style="max-height:150px;"></canvas>
+            <div id="studentsStatusLegends" class="mt-3 legend-container"></div>
+        </div>
+    </div>
 
-            <div class="mt-3 legend-container" id="studentsStatusLegends"></div>
+    <!-- DEPARTMENT -->
+    <div class="col-md-6">
+        <div class="card card-box p-4">
+            <h5>Department Details</h5>
+            <canvas id="departmentChart" style="max-height:150px;"></canvas>
+            <div id="departmentLegends" class="mt-3 legend-container"></div>
         </div>
     </div>
 </div>
 
-<!-- Table of Students shown when Adding the Students -->
-
+<!-- Students Table -->
 <div class="card card-box p-4">
     <div class="d-flex justify-content-between mb-3 flex-wrap gap-2">
         <h5>Students List</h5>
@@ -141,6 +119,7 @@
             <a asp-action="ViewPaper" class="btn btn-primary">View Papers</a>
             <a asp-action="AddScholarship" class="btn btn-primary">Add Scholarship</a>
             <a asp-action="ViewScholarship" class="btn btn-primary">View Scholarship</a>
+            <a asp-action="Dashboard" class="btn btn-primary">View Dashboard</a>
         </div>
     </div>
 
@@ -150,8 +129,8 @@
                 <th>Student ID</th>
                 <th>Register No</th>
                 <th>Profile</th>
-                <th>Student Status</th>
-                <th>Student Name</th>
+                <th>Status</th>
+                <th>Name</th>
                 <th>Department</th>
                 <th>In Time</th>
                 <th>Out Time</th>
@@ -167,37 +146,36 @@
                     <td>
                         @if (!string.IsNullOrEmpty(student.PhotoPath))
                         {
-                            <img src="@student.PhotoPath" style="width:50px;height:50px;object-fit:cover;" />
+                            <img src="@student.PhotoPath" style="width:45px;height:45px;object-fit:cover;border-radius:50%;" />
                         }
                     </td>
                     <td>@student.StudentStatus</td>
                     <td>@student.StudentName</td>
                     <td>@student.Department?.DepartmentName</td>
                     <td>
-                        <span class="in-time">@student.InTime?.ToString("hh:mm tt")</span>
-                        <a href="javascript:void(0);" data-bs-toggle="modal"
-                           data-bs-target="#editTimeModal-@student.StudentId">
+                        <span>@student.InTime?.ToString("hh:mm tt")</span>
+                        <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#editTimeModal-@student.StudentId">
                             <i class="fas fa-clock ms-1"></i>
                         </a>
                     </td>
-                    <td>
-                        <span class="out-time">@student.OutTime?.ToString("hh:mm tt")</span>
-                    </td>
+                    <td>@student.OutTime?.ToString("hh:mm tt")</td>
                     <td class="d-flex gap-1">
-                        <a asp-action="EditStudent"
-                           asp-route-studentId="@student.StudentId"
-                           class="btn btn-warning action-btn">
+                        <a asp-action="EditStudent" asp-route-studentId="@student.StudentId" class="btn btn-warning btn-sm">
                             <i class="fas fa-edit"></i>
                         </a>
-                        <form asp-action="DeleteStudent"
-                              asp-route-studentId="@student.StudentId"
-                              method="post"
-                              onsubmit="return confirm('Are you sure?');">
+                        <form asp-action="DeleteStudent" asp-route-studentId="@student.StudentId" method="post" onsubmit="return confirm('Are you sure?');">
                             @Html.AntiForgeryToken()
-                            <button class="btn btn-danger action-btn">
+                            <button class="btn btn-danger btn-sm">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </form>
+                        <!-- Attendance Button -->
+                        <button class="btn btn-info btn-sm"
+                                data-bs-toggle="modal"
+                                data-bs-target="#attendanceModal-@student.StudentId"
+                                title="Mark Attendance">
+                            <i class="fas fa-user-check"></i>
+                        </button>
                     </td>
                 </tr>
             }
@@ -205,40 +183,26 @@
     </table>
 </div>
 
-<!-- Modals outside table -->
+<!-- Attendance Modals -->
 @foreach (var student in Model)
 {
-    <div class="modal fade" id="editTimeModal-@student.StudentId">
+    <div class="modal fade" id="attendanceModal-@student.StudentId" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form class="edit-time-form" data-studentid="@student.StudentId">
-                    @Html.AntiForgeryToken()
+                <form class="attendance-form" data-student-id="@student.StudentId">
                     <div class="modal-header">
-                        <h5>Edit Time - @student.StudentName</h5>
-                        <button class="btn-close" data-bs-dismiss="modal"></button>
+                        <h5 class="modal-title">Mark Attendance - @student.StudentName</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
-                        <input type="hidden" name="studentId" value="@student.StudentId" />
                         <label>In Time</label>
-
-                        <input type="datetime-local" name="InTime"
-                               value="@student.InTime?.ToString("yyyy-MM-ddTHH:mm")"
-                               class="form-control mb-2" />
-
+                        <input type="datetime-local" name="inTime" class="form-control mb-2" value="@student.InTime?.ToString("yyyy-MM-ddTHH:mm")" />
                         <label>Out Time</label>
-
-                        <input type="datetime-local" name="OutTime"
-                               value="@student.OutTime?.ToString("yyyy-MM-ddTHH:mm")"
-                               class="form-control" />
-
-                        <div class="text-success save-message" style="display:none;">
-                            Saved successfully!
-                        </div>
-
+                        <input type="datetime-local" name="outTime" class="form-control" value="@student.OutTime?.ToString("yyyy-MM-ddTHH:mm")" />
                     </div>
                     <div class="modal-footer">
-                        <button class="btn btn-success">Save</button>
-                        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success">Save Attendance</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     </div>
                 </form>
             </div>
@@ -247,95 +211,112 @@
 }
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-    $(document).ready(function () {
-    
-        // Javascript variables
-        // Daily students status updation
+    $(function () {
 
-        var activeTodayCount = @(activeTodayCount);
-        var inactiveTodayCount = @(inactiveTodayCount);
-        var activeTodayNames = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(activeTodayList.Select(s => s.StudentName)));
-        var inactiveTodayNames = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(inactiveTodayList.Select(s => s.StudentName)));
+        // Chart data
+        var activeTodayCount = @activeTodayCount;
+        var inactiveTodayCount = @inactiveTodayCount;
+        var activeMonthlyCount = @activeMonthlyCount;
+        var inactiveMonthlyCount = @inactiveMonthlyCount;
 
-        // Monthly students statuse updated
-        var activeMonthlyCount = @(activeMonthlyCount);
-        var inactiveMonthlyCount = @(inactiveMonthlyCount);
-        var activeMonthlyNames = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(activeMonthlyList.Select(s => s.StudentName)));
-        var inactiveMonthlyNames = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(inactiveMonthlyList.Select(s => s.StudentName)));
+        var activeTodayNames = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(activeTodayList.Select(x => x.StudentName)));
+        var inactiveTodayNames = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(inactiveTodayList.Select(x => x.StudentName)));
+        var activeMonthlyNames = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(activeMonthlyList.Select(x => x.StudentName)));
+        var inactiveMonthlyNames = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(inactiveMonthlyList.Select(x => x.StudentName)));
 
-        
-        // Doughnut chart for showing the details of students status   
-        var ctx = document.getElementById('studentsStatusChart').getContext('2d');
-        var studentsChart = new Chart(ctx, {
+        var deptToday = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(departmentToday));
+        var deptMonthly = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(departmentMonthly));
+
+        // Students Status Chart
+        var statusChart = new Chart(document.getElementById("studentsStatusChart"), {
             type: 'doughnut',
             data: {
                 labels: ['Active', 'Inactive'],
-                datasets: [{
-                    data: [activeTodayCount, inactiveTodayCount],
-                    backgroundColor: ['#ffc107', '#dc3545'] // yellow/red for daily
-                }]
+                datasets: [{ data: [activeTodayCount, inactiveTodayCount], backgroundColor: ['#ffc107', '#dc3545'] }]
             },
-            options: {
-                plugins: { legend: { display: false } },
-                responsive: true,
-                maintainAspectRatio: false
-            }
+            options: { plugins: { legend: { display: false } } }
         });
 
-        //Adding Legends to the Charts
-        function updateLegend(activeCount, inactiveCount, activeNames, inactiveNames, colors) {
-            var legendContainer = $('#studentsStatusLegends');
-            legendContainer.empty();
-
-            function createLegend(label, count, color, names) {
-                var legend = $(`
+        function updateStatusLegend(active, inactive, activeNames, inactiveNames, colors) {
+            var container = $("#studentsStatusLegends").empty();
+            function row(label, count, color, names) {
+                var el = $(`
                     <div class="d-flex align-items-center mb-1">
                         <span style="width:15px;height:15px;background:${color};display:inline-block;margin-right:8px;"></span>
                         <span>${label}: ${count}</span>
-                        <i class="fas fa-info-circle ms-2" data-bs-toggle="popover" data-bs-html="true" data-bs-content=""></i>
+                        <i class="fas fa-info-circle ms-2" data-bs-toggle="popover" data-bs-html="true"></i>
                     </div>
                 `);
-
-                var content = (names.length > 0) ? `<div style="max-height:150px;overflow:auto;">${names.join('<br>')}</div>` : `Total: ${count}`;
-                legend.find('i').attr('data-bs-content', content);
-                legendContainer.append(legend);
+                el.find("i").attr("data-bs-content", names.length ? names.join("<br>") : `Total: ${count}`);
+                container.append(el);
             }
+            row("Active", active, colors[0], activeNames);
+            row("Inactive", inactive, colors[1], inactiveNames);
 
-            createLegend('Active', activeCount, colors[0], activeNames);
-            createLegend('Inactive', inactiveCount, colors[1], inactiveNames);
-            createLegend('Total', activeCount + inactiveCount, '#198754', []);
-
-            // Initialize popovers
-            var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
-            popoverTriggerList.map(function(el){ return new bootstrap.Popover(el, { trigger: 'hover', html:true }); });
+            document.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => new bootstrap.Popover(el, { trigger: 'hover', html: true }));
         }
 
-        // Initialize daily legend
-        updateLegend(activeTodayCount, inactiveTodayCount, activeTodayNames, inactiveTodayNames, ['#ffc107', '#dc3545']);
+        updateStatusLegend(activeTodayCount, inactiveTodayCount, activeTodayNames, inactiveTodayNames, ['#ffc107', '#dc3545']);
 
-      
-        //Radio button changed
-   
+        // Department Chart
+        function buildDepartmentChart(data) {
+            var labels = data.map(x => x.Department);
+            var counts = data.map(x => x.Count);
+            var colors = labels.map((_, i) => `hsl(${i*60},70%,55%)`);
+            if (window.deptChart) window.deptChart.destroy();
+            window.deptChart = new Chart(document.getElementById("departmentChart"), {
+                type: 'doughnut',
+                data: { labels: labels, datasets: [{ data: counts, backgroundColor: colors }] },
+                options: { plugins: { legend: { display: false } } }
+            });
+            var legend = $("#departmentLegends").empty();
+            data.forEach((d, i) => {
+                var row = $(`
+                    <div class="d-flex align-items-center mb-1">
+                        <span style="width:15px;height:15px;background:${colors[i]};display:inline-block;margin-right:8px;"></span>
+                        <span>${d.Department}: ${d.Count}</span>
+                        <i class="fas fa-info-circle ms-2" data-bs-toggle="popover" data-bs-html="true"></i>
+                    </div>
+                `);
+                row.find("i").attr("data-bs-content", d.Students && d.Students.length ? d.Students.join("<br>") : `Total: ${d.Count}`);
+                legend.append(row);
+            });
+            document.querySelectorAll('#departmentLegends [data-bs-toggle="popover"]').forEach(el => new bootstrap.Popover(el, { trigger: 'hover', html: true }));
+        }
+
+        buildDepartmentChart(deptToday);
+
         $('input[name="statusType"]').change(function() {
-            var selected = $(this).val();
-
-            if(selected === "current") {
-                studentsChart.data.datasets[0].data = [activeTodayCount, inactiveTodayCount];
-                studentsChart.data.datasets[0].backgroundColor = ['#ffc107', '#dc3545'];
-                studentsChart.update();
-                updateLegend(activeTodayCount, inactiveTodayCount, activeTodayNames, inactiveTodayNames, ['#ffc107', '#dc3545']);
-            } else if(selected === "monthly") {
-                studentsChart.data.datasets[0].data = [activeMonthlyCount, inactiveMonthlyCount];
-                studentsChart.data.datasets[0].backgroundColor = ['#6f42c1', '#000000']; // violet/black
-                studentsChart.update();
-                updateLegend(activeMonthlyCount, inactiveMonthlyCount, activeMonthlyNames, inactiveMonthlyNames, ['#6f42c1', '#000000']);
+            if (this.value === "current") {
+                statusChart.data.datasets[0].data = [activeTodayCount, inactiveTodayCount];
+                statusChart.data.datasets[0].backgroundColor = ['#ffc107', '#dc3545'];
+                statusChart.update();
+                updateStatusLegend(activeTodayCount, inactiveTodayCount, activeTodayNames, inactiveTodayNames, ['#ffc107', '#dc3545']);
+                buildDepartmentChart(deptToday);
+            } else {
+                statusChart.data.datasets[0].data = [activeMonthlyCount, inactiveMonthlyCount];
+                statusChart.data.datasets[0].backgroundColor = ['#6f42c1', '#000'];
+                statusChart.update();
+                updateStatusLegend(activeMonthlyCount, inactiveMonthlyCount, activeMonthlyNames, inactiveMonthlyNames, ['#6f42c1', '#000']);
+                buildDepartmentChart(deptMonthly);
             }
         });
+    });
 
+    // Attendance AJAX
+    $(document).on("submit", ".attendance-form", function(e) {
+        e.preventDefault();
+        var form = $(this);
+        $.post("/Student/MarkAttendance", {
+            studentId: form.data("student-id"),
+            inTime: form.find("[name='inTime']").val(),
+            outTime: form.find("[name='outTime']").val()
+        }).done(function() {
+            location.reload();
+        });
     });
 </script>

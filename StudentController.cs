@@ -23,17 +23,47 @@ namespace Students_Portal_App.Controllers
             _studentsInfoServices = studentsInfoServices;
             _studentsPaperService = studentsInfoServices;
             _context = context;
+            
         }
+        //Controller Business logic for Attendance management
+        [HttpPost]
+        public async Task<IActionResult> MarkAttendance(int studentId, DateTime? inTime, DateTime? outTime)
+        {
+            var today = DateTime.Today;
+            var status = inTime.HasValue ? "Present" : "Absent";
+
+            // Always insert new attendance record
+            var attendance = new Attendance
+            {
+                StudentId = studentId,
+                AttendanceDate = today,
+                InTime = inTime,
+                OutTime = outTime,
+                Status = status
+            };
+
+            _context.Attendances.Add(attendance);
+
+            // Optional: Update last known status in StudentsPortalInfos
+            var student = await _context.StudentsPortalInfos
+                .FirstAsync(s => s.StudentId == studentId);
+
+            student.StudentStatus = status == "Present" ? "Active" : "Inactive";
+
+            await _context.SaveChangesAsync();
+            return Ok();
+        }
+
+
+
 
         // GET : Student
         [HttpGet]
         public async Task<IActionResult> Index(int? departmentId)
         {
-            //  Get ALL students
             var allStudents = await _studentsInfoServices.GetStudentsPortalInfosAsync();
 
-            // Filter students ONLY for table
-            var filteredStudents = allStudents;
+            List<StudentsPortalInfos> filteredStudents;
 
             if (departmentId.HasValue)
             {
@@ -41,11 +71,13 @@ namespace Students_Portal_App.Controllers
                     .Where(s => s.DepartmentId == departmentId.Value)
                     .ToList();
             }
+            else
+            {
+                filteredStudents = allStudents;
+            }
 
-            // ALWAYS get departments from Department table 
             var departments = await _context.Departments.ToListAsync();
 
-            // circles: one circle per department
             ViewBag.Departments = departments.Select(d => new
             {
                 DepartmentId = d.DepartmentId,
@@ -53,9 +85,9 @@ namespace Students_Portal_App.Controllers
                 StudentCount = allStudents.Count(s => s.DepartmentId == d.DepartmentId)
             }).ToList();
 
-            //  Send only filtered students to view
             return View(filteredStudents);
         }
+
 
         // GET: Add Student
         [HttpGet]
@@ -143,7 +175,6 @@ namespace Students_Portal_App.Controllers
         }
 
 
-
         //For Edit and Update operations of students details
         [HttpGet]
         public async Task<IActionResult> EditStudent(int studentId)
@@ -165,6 +196,7 @@ namespace Students_Portal_App.Controllers
             return View(student);
         }
 
+        //Method handle the Request and Response of Edit Student Infos
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -334,6 +366,7 @@ namespace Students_Portal_App.Controllers
                 LoadDepartments();
                 return View(model);
             }
+
             //Fields must match to the Papers ViewModel
 
             var paper = new DepartmentPapers

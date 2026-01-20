@@ -22,72 +22,113 @@ namespace Students_Portal_App.Controllers
         {
             _studentsInfoServices = studentsInfoServices;
             _studentsPaperService = studentsInfoServices;
-            _context = context;
+            _context = context;//Dbcontext instance is injected into the controller via constructor
             
         }
         //Controller Business logic for Attendance management
+        [HttpGet]
+        public async Task<IActionResult> Index()
+        {
+            var allStudents = await _studentsInfoServices.GetStudentsPortalInfosAsync();
+
+            ViewBag.TotalStudents = allStudents.ToList().Count;
+
+            DateTime today = DateTime.Today;
+
+            // Active students today (attendance-based)
+            var activeTodayIds = await _context.Attendances
+                .Where(a => a.AttendanceDate == today && a.InTime.HasValue)
+                .Select(a => a.StudentId)
+                .Distinct()
+                .ToListAsync();
+
+            ViewBag.ActiveTodayIds = activeTodayIds;
+
+            var departments = await _context.Departments.ToListAsync();
+            ViewBag.Departments = departments.Select(d => new
+            {
+                d.DepartmentId,
+                d.DepartmentName,
+                StudentCount = allStudents.Count(s => s.DepartmentId == d.DepartmentId)
+            }).ToList();
+
+            return View(allStudents);
+        }
+
+        //For mark attendance      
         [HttpPost]
         public async Task<IActionResult> MarkAttendance(int studentId, DateTime? inTime, DateTime? outTime)
         {
             var today = DateTime.Today;
-            var status = inTime.HasValue ? "Present" : "Absent";
 
-            // Always insert new attendance record
-            var attendance = new Attendance
+            //Add and update attendance
+            var attendance = await _context.Attendances
+                .FirstOrDefaultAsync(a => a.StudentId == studentId && a.AttendanceDate == today);
+
+            if (attendance == null)
             {
-                StudentId = studentId,
-                AttendanceDate = today,
-                InTime = inTime,
-                OutTime = outTime,
-                Status = status
-            };
-
-            _context.Attendances.Add(attendance);
-
-            // Optional: Update last known status in StudentsPortalInfos
-            var student = await _context.StudentsPortalInfos
-                .FirstAsync(s => s.StudentId == studentId);
-
-            student.StudentStatus = status == "Present" ? "Active" : "Inactive";
-
-            await _context.SaveChangesAsync();
-            return Ok();
-        }
-
-
-
-
-        // GET : Student
-        [HttpGet]
-        public async Task<IActionResult> Index(int? departmentId)
-        {
-            var allStudents = await _studentsInfoServices.GetStudentsPortalInfosAsync();
-
-            List<StudentsPortalInfos> filteredStudents;
-
-            if (departmentId.HasValue)
-            {
-                filteredStudents = allStudents
-                    .Where(s => s.DepartmentId == departmentId.Value)
-                    .ToList();
+                attendance = new Attendance
+                {
+                    StudentId = studentId,
+                    AttendanceDate = today,
+                    InTime = inTime,
+                    OutTime = outTime,
+                    Status = inTime.HasValue ? "Active" : "Inactive"
+                };
+                _context.Attendances.Add(attendance);
             }
             else
             {
-                filteredStudents = allStudents;
+                attendance.InTime = inTime;
+                attendance.OutTime = outTime;
+                attendance.Status = inTime.HasValue ? "Active" : "Inactive";
+                _context.Attendances.Update(attendance);
             }
 
-            var departments = await _context.Departments.ToListAsync();
+            await _context.SaveChangesAsync();
 
-            ViewBag.Departments = departments.Select(d => new
+            // Get all the students
+            var allStudents = await _context.StudentsPortalInfos
+                .Include(s => s.Department)
+                .ToListAsync();
+
+            // Get active students today
+            var activeTodayIds = await _context.Attendances
+                .Where(a => a.AttendanceDate == today && a.InTime.HasValue)
+                .Select(a => a.StudentId)
+                .ToListAsync();
+
+            var activeToday = allStudents
+                .Where(s => activeTodayIds.Contains(s.StudentId))
+                .ToList();
+
+            var inactiveToday = allStudents
+                .Where(s => !activeTodayIds.Contains(s.StudentId))
+                .ToList();
+
+            //for department wise active students
+            var department = activeToday
+                .Where(s => s.Department != null)
+                .GroupBy(s => s.Department.DepartmentName)
+                .Select(g => new
+                {
+                    Department = g.Key,
+                    Count = g.Count(),
+                    Students = g.Select(x => x.StudentName).ToList()
+                })
+                .ToList();
+
+            // To update chart dynamically 
+            return Json(new
             {
-                DepartmentId = d.DepartmentId,
-                DepartmentName = d.DepartmentName,
-                StudentCount = allStudents.Count(s => s.DepartmentId == d.DepartmentId)
-            }).ToList();
-
-            return View(filteredStudents);
+                activeCount = activeToday.Count,
+                inactiveCount = inactiveToday.Count,
+                activeNames = activeToday.Select(x => x.StudentName).ToList(),
+                inactiveNames = inactiveToday.Select(x => x.StudentName).ToList(),
+                activeIds = activeToday.Select(x => x.StudentId).Distinct().ToList(),
+                department
+            });
         }
-
 
         // GET: Add Student
         [HttpGet]
@@ -103,7 +144,6 @@ namespace Students_Portal_App.Controllers
 
             return View();
         }
-
 
         // POST: Add Student
         [HttpPost]

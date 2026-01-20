@@ -1,23 +1,22 @@
-﻿@using Students_Portal_App.Models.Entities;
+﻿@using Students_Portal_App.Models.Entities
 @model List<StudentsPortalInfos>
 
 @{
     ViewData["Title"] = "Students Dashboard";
 
     var today = DateTime.Today;
+    var totalStudents = ViewBag.TotalStudents as int? ?? Model.Count;
 
-    /* Today Chart */
-    var studentsToday = Model
-        .Where(s => s.InTime.HasValue && s.InTime.Value.Date == today)
-        .ToList();
+    var activeIds = ViewBag.ActiveTodayIds as List<int> ?? new List<int>();
 
-    var activeTodayList = studentsToday.Where(s => s.StudentStatus == "Active").ToList();
-    var inactiveTodayList = studentsToday.Where(s => s.StudentStatus != "Active").ToList();
+    // Active / Inactive today based on attendance
+    var activeTodayList = Model.Where(s => activeIds.Contains(s.StudentId)).ToList();
+    var inactiveTodayList = Model.Where(s => !activeIds.Contains(s.StudentId)).ToList();
 
     var activeTodayCount = activeTodayList.Count;
-    var inactiveTodayCount = inactiveTodayList.Count;
+    var inactiveTodayCount = totalStudents - activeTodayCount;
 
-    /* Monthly Chart */
+    //Monthly students status chart
     var studentsMonthly = Model
         .Where(s => s.InTime.HasValue &&
                     s.InTime.Value.Month == today.Month &&
@@ -28,10 +27,10 @@
     var inactiveMonthlyList = studentsMonthly.Where(s => s.StudentStatus != "Active").ToList();
 
     var activeMonthlyCount = activeMonthlyList.Count;
-    var inactiveMonthlyCount = inactiveMonthlyList.Count;
+    var inactiveMonthlyCount = totalStudents - activeMonthlyCount;
 
     /* Department Details */
-    var departmentToday = studentsToday
+    var departmentToday = activeTodayList
         .Where(s => s.Department != null)
         .GroupBy(s => s.Department.DepartmentName)
         .Select(g => new
@@ -74,11 +73,14 @@
     .popover-body {
         max-height: 150px;
         overflow-y: auto;
-        
     }
 </style>
 
-<!-- Radio button for both monthly and daily (Today) -->
+<h4 class="mb-3">
+    Strength of Students :
+    <span class="fw-bold text-primary">@totalStudents</span>
+</h4>
+
 <div class="mb-3">
     <label class="me-3">
         <input type="radio" name="statusType" value="current" checked /> Current
@@ -90,7 +92,6 @@
 
 <!-- Charts -->
 <div class="row mb-4">
-    <!-- Status -->
     <div class="col-md-6">
         <div class="card card-box p-4">
             <h5>Students Status</h5>
@@ -99,7 +100,6 @@
         </div>
     </div>
 
-    <!-- DEPARTMENT -->
     <div class="col-md-6">
         <div class="card card-box p-4">
             <h5>Department Details</h5>
@@ -160,20 +160,12 @@
                     </td>
                     <td>@student.OutTime?.ToString("hh:mm tt")</td>
                     <td class="d-flex gap-1">
-                        <a asp-action="EditStudent" asp-route-studentId="@student.StudentId" class="btn btn-warning btn-sm">
-                            <i class="fas fa-edit"></i>
-                        </a>
+                        <a asp-action="EditStudent" asp-route-studentId="@student.StudentId" class="btn btn-warning btn-sm"><i class="fas fa-edit"></i></a>
                         <form asp-action="DeleteStudent" asp-route-studentId="@student.StudentId" method="post" onsubmit="return confirm('Are you sure?');">
                             @Html.AntiForgeryToken()
-                            <button class="btn btn-danger btn-sm">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                            <button class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
                         </form>
-                        <!-- Attendance Button -->
-                        <button class="btn btn-info btn-sm"
-                                data-bs-toggle="modal"
-                                data-bs-target="#attendanceModal-@student.StudentId"
-                                title="Mark Attendance">
+                        <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#attendanceModal-@student.StudentId" title="Mark Attendance">
                             <i class="fas fa-user-check"></i>
                         </button>
                     </td>
@@ -215,9 +207,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-    $(function () {
-
-        // Chart data
+    $(function() {
         var activeTodayCount = @activeTodayCount;
         var inactiveTodayCount = @inactiveTodayCount;
         var activeMonthlyCount = @activeMonthlyCount;
@@ -231,7 +221,7 @@
         var deptToday = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(departmentToday));
         var deptMonthly = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(departmentMonthly));
 
-        // Students Status Chart
+        //Students status chart
         var statusChart = new Chart(document.getElementById("studentsStatusChart"), {
             type: 'doughnut',
             data: {
@@ -244,48 +234,59 @@
         function updateStatusLegend(active, inactive, activeNames, inactiveNames, colors) {
             var container = $("#studentsStatusLegends").empty();
             function row(label, count, color, names) {
-                var el = $(`
-                    <div class="d-flex align-items-center mb-1">
-                        <span style="width:15px;height:15px;background:${color};display:inline-block;margin-right:8px;"></span>
-                        <span>${label}: ${count}</span>
-                        <i class="fas fa-info-circle ms-2" data-bs-toggle="popover" data-bs-html="true"></i>
-                    </div>
-                `);
+                var el = $(`<div class="d-flex align-items-center mb-1">
+                    <span style="width:15px;height:15px;background:${color};display:inline-block;margin-right:8px;"></span>
+                    <span>${label}: ${count}</span>
+                    <i class="fas fa-info-circle ms-2" data-bs-toggle="popover" data-bs-html="true"></i>
+                </div>`);
                 el.find("i").attr("data-bs-content", names.length ? names.join("<br>") : `Total: ${count}`);
                 container.append(el);
             }
             row("Active", active, colors[0], activeNames);
             row("Inactive", inactive, colors[1], inactiveNames);
-
             document.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => new bootstrap.Popover(el, { trigger: 'hover', html: true }));
         }
 
         updateStatusLegend(activeTodayCount, inactiveTodayCount, activeTodayNames, inactiveTodayNames, ['#ffc107', '#dc3545']);
 
-        // Department Chart
-        function buildDepartmentChart(data) {
-            var labels = data.map(x => x.Department);
-            var counts = data.map(x => x.Count);
-            var colors = labels.map((_, i) => `hsl(${i*60},70%,55%)`);
+        // --- Department Chart with High / Medium / Low ---
+        function buildDepartmentChart(departments) {
+            var high = departments.filter(d => d.Count >= 5);
+            var medium = departments.filter(d => d.Count >= 2 && d.Count < 5);
+            var low = departments.filter(d => d.Count < 1);
+
+            var categories = [
+                { label: "High", depts: high },
+                { label: "Medium", depts: medium },
+                { label: "Low", depts: low }
+            ];
+
+            var labels = categories.map(c => c.label);
+            var counts = categories.map(c => c.depts.length);
+            var colors = ['#198754', '#ffc107', '#dc3545'];
+
             if (window.deptChart) window.deptChart.destroy();
             window.deptChart = new Chart(document.getElementById("departmentChart"), {
                 type: 'doughnut',
                 data: { labels: labels, datasets: [{ data: counts, backgroundColor: colors }] },
                 options: { plugins: { legend: { display: false } } }
             });
+
             var legend = $("#departmentLegends").empty();
-            data.forEach((d, i) => {
-                var row = $(`
-                    <div class="d-flex align-items-center mb-1">
-                        <span style="width:15px;height:15px;background:${colors[i]};display:inline-block;margin-right:8px;"></span>
-                        <span>${d.Department}: ${d.Count}</span>
-                        <i class="fas fa-info-circle ms-2" data-bs-toggle="popover" data-bs-html="true"></i>
-                    </div>
-                `);
-                row.find("i").attr("data-bs-content", d.Students && d.Students.length ? d.Students.join("<br>") : `Total: ${d.Count}`);
+            categories.forEach((c, i) => {
+                var deptNames = c.depts.map(d => d.Department);
+                var row = $(`<div class="d-flex align-items-center mb-1">
+                    <span style="width:15px;height:15px;background:${colors[i]};display:inline-block;margin-right:8px;"></span>
+                    <span>${c.label}: ${c.depts.length}</span>
+                    <i class="fas fa-info-circle ms-2" data-bs-toggle="popover" data-bs-html="true"></i>
+                </div>`);
+                row.find("i").attr("data-bs-content", deptNames.length ? deptNames.join("<br>") : `No departments`);
                 legend.append(row);
             });
-            document.querySelectorAll('#departmentLegends [data-bs-toggle="popover"]').forEach(el => new bootstrap.Popover(el, { trigger: 'hover', html: true }));
+
+            document.querySelectorAll('#departmentLegends [data-bs-toggle="popover"]').forEach(el =>
+                new bootstrap.Popover(el, { trigger: 'hover', html: true })
+            );
         }
 
         buildDepartmentChart(deptToday);
@@ -305,18 +306,35 @@
                 buildDepartmentChart(deptMonthly);
             }
         });
-    });
 
-    // Attendance AJAX
-    $(document).on("submit", ".attendance-form", function(e) {
-        e.preventDefault();
-        var form = $(this);
-        $.post("/Student/MarkAttendance", {
-            studentId: form.data("student-id"),
-            inTime: form.find("[name='inTime']").val(),
-            outTime: form.find("[name='outTime']").val()
-        }).done(function() {
-            location.reload();
+        // Attendance AJAX
+        $(document).on("submit", ".attendance-form", function(e) {
+            e.preventDefault();
+            var form = $(this);
+            var studentId = form.data("student-id");
+
+            $.post("/Student/MarkAttendance", {
+                studentId: studentId,
+                inTime: form.find("[name='inTime']").val(),
+                outTime: form.find("[name='outTime']").val()
+            }).done(function(data) {
+                var modalEl = document.getElementById('attendanceModal-' + studentId);
+                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+
+                activeTodayCount = data.activeCount;
+                inactiveTodayCount = totalStudents - data.activeCount;
+                activeTodayNames = data.activeNames;
+                inactiveTodayNames = data.inactiveNames;
+
+                statusChart.data.datasets[0].data = [activeTodayCount, inactiveTodayCount];
+                statusChart.update();
+                updateStatusLegend(activeTodayCount, inactiveTodayCount, activeTodayNames, inactiveTodayNames, ['#ffc107', '#dc3545']);
+
+                buildDepartmentChart(data.department);
+            }).fail(function(err) {
+                console.error("Attendance update failed:", err);
+                alert("Failed to mark attendance. Please try again.");
+            });
         });
     });
 </script>

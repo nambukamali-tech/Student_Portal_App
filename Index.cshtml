@@ -1,59 +1,29 @@
-﻿@using Students_Portal_App.Models.Entities
+﻿@using Students_Portal_App.DTOs
 @model Students_Portal_App.ViewModels.IndexViewModel
 
 @{
     ViewData["Title"] = "Students Dashboard";
 
-    var today = DateTime.Today;
+    // Attendance DTO from controller
+    var attendance = Model.AttendanceSummary;
+
+    // Current counts and names
+    var activeTodayCount = attendance.ActiveCount;
+    var inactiveTodayCount = attendance.InactiveCount;
+    var activeTodayNames = attendance.ActiveNames;
+    var inactiveTodayNames = attendance.InactiveNames;
+    var departmentToday = attendance.Departments;
+
+    // Monthly counts and names
+    var activeMonthlyCount = attendance.MonthlyPresentCount;
+    var inactiveMonthlyCount = attendance.MonthlyAbsentCount;
+    var activeMonthlyNames = attendance.MonthlyPresentNames;
+    var inactiveMonthlyNames = attendance.MonthlyAbsentNames;
+    var departmentMonthly = attendance.MonthlyDepartments;
+
     var totalStudents = Model.TotalStudents;
-
-    var activeIds = ViewBag.ActiveTodayIds as List<int> ?? new List<int>();
-
-    // Active / Inactive today based on attendance
-    var activeTodayList = Model.Students.Where(s => s.StudentStatus == "Active" || s.StudentStatus == "Present").ToList();
-    var inactiveTodayList = Model.Students.Where(s => s.StudentStatus == "Inactive" || s.StudentStatus == "Absent").ToList();
-
-
-    var activeTodayCount = activeTodayList.Count;
-    var inactiveTodayCount = inactiveTodayList.Count;
-
-
-    //Monthly students status chart
-    // Monthly students status chart
-    var activeMonthlyList = Model.Students.Where(s => s.StudentStatus == "Present").ToList();
-    var inactiveMonthlyList = Model.Students.Where(s => s.StudentStatus == "Absent").ToList();
-
-    var activeMonthlyCount = activeMonthlyList.Count;
-    var inactiveMonthlyCount = inactiveMonthlyList.Count;
-
-
-
-   
-
-
-    /* Department Details */
-    var departmentToday = activeTodayList
-        .Where(s => !string.IsNullOrWhiteSpace( s.DepartmentName))
-        .GroupBy(s => s.DepartmentName)
-        .Select(g => new
-        {
-            Department = g.Key,
-            Count = g.Count(),
-            Students = g.Select(x => x.StudentName).ToList()
-        }).ToList();
-
-    var departmentMonthly = Model.Students
-     .Where(s => !string.IsNullOrWhiteSpace(s.DepartmentName))
-     .GroupBy(s => s.DepartmentName)
-     .Select(g => new
-     {
-         Department = g.Key,
-         Count = g.Count(),
-         Students = g.Select(x => x.StudentName).ToList()
-     }).ToList();
-
-
 }
+
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
@@ -82,7 +52,7 @@
 
 <h4 class="mb-3">
     Strength of Students :
-    <span class="fw-bold text-primary">@totalStudents</span>
+    <span class="fw-bold text-primary">@Model.TotalStudents</span>
 </h4>
 
 <div class="mb-3">
@@ -131,8 +101,8 @@
         <thead class="table-light">
             <tr>
                 <th>Student ID</th>
-                <th>Register No</th>
-                
+                <th>Profile</th>
+                <th>Register No</th>                
                 <th>Status</th>
                 <th>Name</th>
                 <th>Department</th>
@@ -142,22 +112,38 @@
             </tr>
         </thead>
         <tbody>
-            @foreach (var student in Model.Students)
+            @foreach (var student in Model.StudentsAttendance)
             {
                 <tr id="student-row-@student.StudentId">
                     <td>@student.StudentId</td>
+                    <td>
+                        <img src="@student.PhotoPath"
+                             style="width:45px;height:45px;border-radius:50%;object-fit:cover;"
+                             class="border shadow-sm"
+                             onerror="this.src='/images/default-user.png';" />
+                    </td>
+
                     <td>@student.RegisterNumber</td>
-                   
-                    <td>@student.StudentStatus</td>
+                    <td>
+                     @(student.InTime.HasValue ? "Present" : "Absent")
+                    </td>
+
+                  
                     <td>@student.StudentName</td>
                     <td>@student.DepartmentName</td>
                     <td>
-                        <span>@student.InTime?.ToString("hh:mm tt")</span>
-                        <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#editTimeModal-@student.StudentId">
-                            <i class="fas fa-clock ms-1"></i>
-                        </a>
+                        @(student.InTime.HasValue ?
+                        student.InTime.Value.ToString("hh:mm tt")
+                        : "-")
+                        
                     </td>
-                    <td>@student.OutTime?.ToString("hh:mm tt")</td>
+                
+                    <td>
+                        @(student.OutTime.HasValue ?
+                        student.OutTime.Value.ToString("hh:mm tt")
+                        : "-")
+                    </td>
+
                     <td class="d-flex gap-1">
                         <a asp-action="EditStudent" asp-route-studentId="@student.StudentId" class="btn btn-warning btn-sm"><i class="fas fa-edit"></i></a>
                         <form asp-action="DeleteStudent" asp-route-studentId="@student.StudentId" method="post" onsubmit="return confirm('Are you sure?');">
@@ -170,27 +156,33 @@
                     </td>
                 </tr>
             }
+
         </tbody>
     </table>
 </div>
 
 <!-- Attendance Modals -->
-@foreach (var student in Model.Students)
+@foreach (var student in Model.StudentsAttendance)
 {
     <div class="modal fade" id="attendanceModal-@student.StudentId" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <form class="attendance-form" data-student-id="@student.StudentId">
                     <div class="modal-header">
-                        <h5 class="modal-title">Mark Attendance - @student.StudentName</h5>
+                        <h5 class="modal-title">Mark Attendance - @student.StudentName
+                        - @DateTime.Today.ToString("yyyy-MM-dd")</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                    <div class="modal-body">
-                        <label>In Time</label>
-                        <input type="datetime-local" name="inTime" class="form-control mb-2" value="@student.InTime?.ToString("yyyy-MM-ddTHH:mm")" />
-                        <label>Out Time</label>
-                        <input type="datetime-local" name="outTime" class="form-control" value="@student.OutTime?.ToString("yyyy-MM-ddTHH:mm")" />
-                    </div>
+                    <div>
+                    <label>In Time</label>
+                    <input type="time" name="inTime" class="form-control mb-2"
+                           value="@student.InTime?.ToString("HH:mm")" />
+
+                    <label>Out Time</label>
+                    <input type="time" name="outTime" class="form-control"
+                           value="@student.OutTime?.ToString("HH:mm")" />
+                           </div>
+
                     <div class="modal-footer">
                         <button type="submit" class="btn btn-success">Save Attendance</button>
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -200,19 +192,19 @@
         </div>
     </div>
 }
-
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script>
     $(function() {
-        // Initial Data from Razor
+
         const data = {
             current: {
                 count: [@activeTodayCount, @inactiveTodayCount],
                 names: [
-                    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(activeTodayList.Select(x => x.StudentName))),
-                    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(inactiveTodayList.Select(x => x.StudentName)))
+                    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(activeTodayNames)),
+                    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(inactiveTodayNames))
                 ],
                 dept: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(departmentToday)),
                 labels: ['Active', 'Inactive'],
@@ -220,9 +212,10 @@
             },
             monthly: {
                 count: [@activeMonthlyCount, @inactiveMonthlyCount],
+               
                 names: [
-                    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(activeMonthlyList.Select(x => x.StudentName))),
-                    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(inactiveMonthlyList.Select(x => x.StudentName)))
+                    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(activeMonthlyNames)),
+                    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(inactiveMonthlyNames))
                 ],
                 dept: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(departmentMonthly)),
                 labels: ['Present', 'Absent'],
@@ -237,10 +230,7 @@
             type: 'doughnut',
             data: {
                 labels: data[currentType].labels,
-                datasets: [{
-                    data: data[currentType].count,
-                    backgroundColor: data[currentType].colors
-                }]
+                datasets: [{ data: data[currentType].count, backgroundColor: data[currentType].colors }]
             },
             options: { plugins: { legend: { display: false } } }
         });
@@ -251,16 +241,19 @@
             const colors = data[type].colors;
 
             const container = $("#studentsStatusLegends").empty();
+
             function row(label, count, color, names) {
                 const el = $(`
                     <div class="d-flex align-items-center mb-1">
                         <span style="width:15px;height:15px;background:${color};display:inline-block;margin-right:8px;"></span>
                         <span>${label}: ${count}</span>
                         <i class="fas fa-info-circle ms-2" data-bs-toggle="popover" data-bs-html="true"></i>
-                    </div>`);
+                    </div>
+                `);
                 el.find("i").attr("data-bs-content", names.length ? names.join("<br>") : `Total: ${count}`);
                 container.append(el);
             }
+
             row(data[type].labels[0], active, colors[0], activeNames);
             row(data[type].labels[1], inactive, colors[1], inactiveNames);
 
@@ -268,45 +261,55 @@
                 new bootstrap.Popover(el, { trigger: 'hover', html: true })
             );
         }
+        //Building department chart
+      function buildDepartmentChart(departments) {
+    // ensure Count is numeric
+    departments.forEach(d => {
+        if (!d.Count) d.Count = 0;
+    });
 
-        function buildDepartmentChart(departments) {
-            const high = departments.filter(d => d.Count >= 5);
-            const medium = departments.filter(d => d.Count >= 2 && d.Count < 5);
-            const low = departments.filter(d => d.Count < 2);
+    const high = departments.filter(d => d.Count >= 5);
+    const medium = departments.filter(d => d.Count >= 2 && d.Count < 5);
+    const low = departments.filter(d => d.Count < 2);
 
-            const categories = [
-                { label: "High", depts: high },
-                { label: "Medium", depts: medium },
-                { label: "Low", depts: low }
-            ];
+    const categories = [
+        { label: "High", depts: high },
+        { label: "Medium", depts: medium },
+        { label: "Low", depts: low }
+    ];
 
-            const counts = categories.map(c => c.depts.length);
-            const colors = ['#198754', '#ffc107', '#dc3545'];
+    const counts = categories.map(c => c.depts.length);
+    const colors = ['#198754', '#ffc107', '#dc3545'];
 
-            if (window.deptChart) window.deptChart.destroy();
-            window.deptChart = new Chart(document.getElementById("departmentChart"), {
-                type: 'doughnut',
-                data: { labels: categories.map(c => c.label), datasets: [{ data: counts, backgroundColor: colors }] },
-                options: { plugins: { legend: { display: false } } }
-            });
+    if (window.deptChart) window.deptChart.destroy();
+    window.deptChart = new Chart(document.getElementById("departmentChart"), {
+        type: 'doughnut',
+        data: { labels: categories.map(c => c.label), datasets: [{ data: counts, backgroundColor: colors }] },
+        options: { plugins: { legend: { display: false } } }
+    });
 
-            const legend = $("#departmentLegends").empty();
-            categories.forEach((c, i) => {
-                const deptNames = c.depts.map(d => d.Department);
-                const row = $(`
-                    <div class="d-flex align-items-center mb-1">
-                        <span style="width:15px;height:15px;background:${colors[i]};display:inline-block;margin-right:8px;"></span>
-                        <span>${c.label}: ${c.depts.length}</span>
-                        <i class="fas fa-info-circle ms-2" data-bs-toggle="popover" data-bs-html="true"></i>
-                    </div>`);
-                row.find("i").attr("data-bs-content", deptNames.length ? deptNames.join("<br>") : `No departments`);
-                legend.append(row);
-            });
+    const legend = $("#departmentLegends").empty();
+    categories.forEach((c, i) => {
+        const deptNames = c.depts.map(d => d.DepartmentName);
+        const row = $(`
+            <div class="d-flex align-items-center mb-1">
+                <span style="width:15px;height:15px;background:${colors[i]};display:inline-block;margin-right:8px;"></span>
+                <span>${c.label}: ${c.depts.length}</span>
+                <i class="fas fa-info-circle ms-2" data-bs-toggle="popover" data-bs-html="true"></i>
+            </div>
+        `);
+        row.find("i").attr("data-bs-content", deptNames.length ? deptNames.join("<br>") : `No departments`);
+        legend.append(row);
+    });
 
-            document.querySelectorAll('#departmentLegends [data-bs-toggle="popover"]').forEach(el =>
-                new bootstrap.Popover(el, { trigger: 'hover', html: true })
-            );
-        }
+    document.querySelectorAll('#departmentLegends [data-bs-toggle="popover"]').forEach(el =>
+        new bootstrap.Popover(el, { trigger: 'hover', html: true })
+    );
+}
+
+    console.log("Monthly Present Names:", @Html.Raw(System.Text.Json.JsonSerializer.Serialize(activeMonthlyNames)));
+    console.log("Monthly Absent Names:", @Html.Raw(System.Text.Json.JsonSerializer.Serialize(inactiveMonthlyNames)));
+
 
         // Initial load
         updateStatusLegend(currentType);
@@ -324,35 +327,72 @@
             buildDepartmentChart(data[currentType].dept);
         });
 
-        // Attendance AJAX
-        $(document).on("submit", ".attendance-form", function(e) {
-            e.preventDefault();
-            const form = $(this);
-            const studentId = form.data("student-id");
+        //for attendance form submission
+            $('.attendance-form').submit(function(e) {
+        e.preventDefault();
+        const form = $(this);
+        const studentId = form.data('student-id');
+        const inTime = form.find('[name="inTime"]').val();
+        const outTime = form.find('[name="outTime"]').val();
 
-            $.post("/Student/MarkAttendance", {
-                studentId: studentId,
-                inTime: form.find("[name='inTime']").val(),
-                outTime: form.find("[name='outTime']").val()
-            }).done(function(resp) {
-                const modalEl = document.getElementById('attendanceModal-' + studentId);
-                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        $.post('/Student/MarkAttendance', { StudentId: studentId, InTime: inTime, OutTime: outTime }, function(result) {
+            console.log('Attendance updated', result);
 
-                // Update Current data
-                data.current.count = [resp.activeCount, resp.inactiveCount];
-                data.current.names = [resp.activeNames, resp.inactiveNames];
-                data.current.dept = resp.department;
+            // fetch updated data for charts
+              $.get('/Student/GetStudentsStatus', function(updatedData) {
+        // Update status chart
+            if(currentType === "current"){
+        data.current.count = [
+            updatedData.AttendanceSummary.ActiveCount,
+            updatedData.AttendanceSummary.InactiveCount
+        ];
 
-                if (currentType === 'current') {
-                    statusChart.data.datasets[0].data = data.current.count;
-                    statusChart.update();
-                    updateStatusLegend('current');
-                    buildDepartmentChart(data.current.dept);
-                }
-            }).fail(function(err) {
-                console.error("Attendance update failed:", err);
-                alert("Failed to mark attendance. Please try again.");
-            });
+        data.current.names = [
+            updatedData.AttendanceSummary.ActiveNames,
+            updatedData.AttendanceSummary.InactiveNames
+        ];
+    }
+
+    if(currentType === "monthly"){
+        data.monthly.count = [
+            updatedData.AttendanceSummary.MonthlyPresentCount,
+            updatedData.AttendanceSummary.MonthlyAbsentCount
+        ];
+
+        data.monthly.names = [
+            updatedData.AttendanceSummary.MonthlyPresentNames,
+            updatedData.AttendanceSummary.MonthlyAbsentNames
+        ];
+    }
+
+    // Update chart
+    statusChart.data.datasets[0].data = data[currentType].count;
+    statusChart.update();
+
+    // Update legend
+    updateStatusLegend(currentType);
+
+        statusChart.update();
+
+        // Update legend based on selected radio
+        updateStatusLegend(currentType);
+
+        // Use correct department data for current or monthly
+        const deptData = currentType === 'current'
+            ? updatedData.AttendanceSummary.Departments
+            : updatedData.AttendanceSummary.MonthlyDepartments;
+
+        buildDepartmentChart(deptData);
+
+        // Close modal
+        form.closest('.modal').modal('hide');
+    });
+            // close modal
+            form.closest('.modal').modal('hide');
         });
     });
+
+
+    });
+
 </script>

@@ -9,6 +9,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 //Register Services 
 builder.Services.AddScoped<IStudentInformationsServices, StudentInformationsServices>();
+//Register Attendance services
+builder.Services.AddScoped<IAttendanceService, ActivityService>();
+builder.Services.AddScoped<IDbAccessorService, DbAccessorService>();//code like this
+builder.Services.AddScoped<StudentsService>();
+builder.Services.AddScoped<IDashboardService, StudentDashboardService>();
 //Register DbContext to Mysql
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 options.UseMySql(
@@ -24,10 +29,11 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
+
+    
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
-
 
 
 app.UseHttpsRedirection();

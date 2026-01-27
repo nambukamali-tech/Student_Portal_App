@@ -12,361 +12,147 @@ namespace Students_Portal_App.Controllers
     public class StudentController : Controller
     {
         private readonly IStudentInformationsServices _studentsInfoServices;//take method from interface name ie) IStudentInformationsServices
-      //_studentsInfoServices  is a private field of the class
+        //_studentsInfoServices  is a private field of the class
         private readonly IStudentInformationsServices _studentsPaperService;
-        //_studentsPaperService is a private field of the class
-        private readonly ApplicationDbContext _context;
-        //_context is a private field of the class
 
-        public StudentController(IStudentInformationsServices studentsInfoServices, ApplicationDbContext context)
+        //_studentsPaperService is a private field of the class
+        private readonly ApplicationDbContext _context; //Remove
+
+        //_context is a private field of the class
+        private readonly IAttendanceService _attendanceService;
+        //dashboard service
+        private readonly IDashboardService _dashboardService;
+        //student service
+        private readonly IStudentServiceInterface _studentService;
+        
+
+        public StudentController(IStudentInformationsServices studentsInfoServices,
+            IStudentServiceInterface studentService,
+            IAttendanceService attendanceService, IDashboardService dashboardService,
+            ApplicationDbContext context)
+
         {
             _studentsInfoServices = studentsInfoServices;
             _studentsPaperService = studentsInfoServices;
-            _context = context;//Dbcontext instance is injected into the controller via constructor
+            _context = context; //Dbcontext instance is injected into the controller via constructor
+            _attendanceService = attendanceService; //need to clear the error here
+            _dashboardService = dashboardService;
+            _studentService = studentService;
             
         }
-        //Controller Business logic for Attendance management
+      
+       //Controller for index page only handles the request and response
         [HttpGet]
         public async Task<IActionResult> Index()
-        {
-            var allStudents = await _studentsInfoServices.GetStudentsPortalInfosAsync();
-
-            ViewBag.TotalStudents = allStudents.ToList().Count;
-
-            DateTime today = DateTime.Today;
-
-            // Active students today (attendance-based)
-            var activeTodayIds = await _context.Attendances
-                .Where(a => a.AttendanceDate == today && a.InTime.HasValue)
-                .Select(a => a.StudentId)
-                .Distinct()
-                .ToListAsync();
-
-            ViewBag.ActiveTodayIds = activeTodayIds;
-
-            var departments = await _context.Departments.ToListAsync();
-            ViewBag.Departments = departments.Select(d => new
-            {
-                d.DepartmentId,
-                d.DepartmentName,
-                StudentCount = allStudents.Count(s => s.DepartmentId == d.DepartmentId)
-            }).ToList();
-
-            return View(allStudents);
+        {         
+            var attendanceSummary = await _attendanceService.GetIndexAsync();
+            return View(attendanceSummary);       
         }
 
-        //For mark attendance      
+        //For Mark Attendance Get Method for handling the request and response
         [HttpPost]
-        public async Task<IActionResult> MarkAttendance(int studentId, DateTime? inTime, DateTime? outTime)
+        public async Task<IActionResult> MarkAttendance(int StudentId , DateTime? InTime, DateTime? OutTime)
         {
-            var today = DateTime.Today;
-
-            //Add and update attendance
-            var attendance = await _context.Attendances
-                .FirstOrDefaultAsync(a => a.StudentId == studentId && a.AttendanceDate == today);
-
-            if (attendance == null)
-            {
-                attendance = new Attendance
-                {
-                    StudentId = studentId,
-                    AttendanceDate = today,
-                    InTime = inTime,
-                    OutTime = outTime,
-                    Status = inTime.HasValue ? "Active" : "Inactive"
-                };
-                _context.Attendances.Add(attendance);
-            }
-            else
-            {
-                attendance.InTime = inTime;
-                attendance.OutTime = outTime;
-                attendance.Status = inTime.HasValue ? "Active" : "Inactive";
-                _context.Attendances.Update(attendance);
-            }
-
-            await _context.SaveChangesAsync();
-
-            // Get all the students
-            var allStudents = await _context.StudentsPortalInfos
-                .Include(s => s.Department)
-                .ToListAsync();
-
-            // Get active students today
-            var activeTodayIds = await _context.Attendances
-                .Where(a => a.AttendanceDate == today && a.InTime.HasValue)
-                .Select(a => a.StudentId)
-                .ToListAsync();
-
-            var activeToday = allStudents
-                .Where(s => activeTodayIds.Contains(s.StudentId))
-                .ToList();
-
-            var inactiveToday = allStudents
-                .Where(s => !activeTodayIds.Contains(s.StudentId))
-                .ToList();
-
-            //for department wise active students
-            var department = activeToday
-                .Where(s => s.Department != null)
-                .GroupBy(s => s.Department.DepartmentName)
-                .Select(g => new
-                {
-                    Department = g.Key,
-                    Count = g.Count(),
-                    Students = g.Select(x => x.StudentName).ToList()
-                })
-                .ToList();
-
-            // To update chart dynamically 
-            return Json(new
-            {
-                activeCount = activeToday.Count,
-                inactiveCount = inactiveToday.Count,
-                activeNames = activeToday.Select(x => x.StudentName).ToList(),
-                inactiveNames = inactiveToday.Select(x => x.StudentName).ToList(),
-                activeIds = activeToday.Select(x => x.StudentId).Distinct().ToList(),
-                department
-            });
+           var result = await _attendanceService.MarkAttendanceAsync(StudentId, InTime, OutTime);
+            return Json(result);
         }
 
-        // GET: Add Student
+        // Add Student Get Method
         [HttpGet]
         public async Task<IActionResult> AddStudent()
         {
-            var departments = await _context.Departments.ToListAsync();
-
-            ViewBag.Departments = new SelectList(
-                departments,
-                "DepartmentId",
-                "DepartmentName"
-            );
-
+            var departments = await _studentService.GetDepartmentsAsync();
+            ViewBag.Departments = new SelectList(departments, "DepartmentId", "DepartmentName");
             return View();
         }
 
-        // POST: Add Student
+        // Add Student Post Method
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AddStudent(StudentsPortalInfos model, IFormFile? Photo)
+        public async Task<IActionResult> AddStudent(Add_EditStudentVm model, IFormFile? Photo)
         {
             if (!ModelState.IsValid)
             {
-                ViewBag.Departments = new SelectList(
-                    await _context.Departments.ToListAsync(),
-                    "DepartmentId",
-                    "DepartmentName",
-                    model.DepartmentId
-                );
+                // Get departments for dropdown
+                var departments = await _studentService.GetDepartmentsAsync();
+                ViewBag.Departments = new SelectList(departments, "DepartmentId", "DepartmentName", model.DepartmentId);
 
                 return View(model);
             }
 
-
-            // Handle photo upload
-            if (Photo != null && Photo.Length > 0)
-            {
-                if (!Photo.ContentType.StartsWith("image/"))
-                {
-                    ModelState.AddModelError("Photo", "Only image files are allowed.");
-                    ViewBag.Departments = new SelectList(
-                        await _context.Departments.ToListAsync(),
-                        "DepartmentId",
-                        "DepartmentName"
-                    );
-                    return View(model);
-                }
-
-                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads/students");
-                if (!Directory.Exists(uploadsFolder))
-                    Directory.CreateDirectory(uploadsFolder);
-
-                var fileName = $"{Guid.NewGuid()}_{Photo.FileName}";
-                var filePath = Path.Combine(uploadsFolder, fileName);
-
-                using var stream = new FileStream(filePath, FileMode.Create);
-                await Photo.CopyToAsync(stream);
-
-                model.PhotoPath = $"/uploads/students/{fileName}";
-            }
-
-             await _studentsInfoServices.AddStudentsPortalInfosAsync(model);
-            return RedirectToAction("Index");
-        }
-
-        //For Update Time controller
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UpdateTime(UpdateTimedtos model)//Request receive and response using IActionResult
-        {
-            if (model.StudentId <= 0)
-                return BadRequest("Invalid student ID");
-
-            var student = await _studentsInfoServices.GetStudentByIdAsync(model.StudentId);
-            if (student == null)
-                return NotFound("Student not found");
-
-            student.InTime = model.InTime;
-            student.OutTime = model.OutTime;
-
-            await _studentsInfoServices.UpdateStudentsPortalInfosAsync(student);
-
-            return Ok();//200 response
-        }
-
-
-        //For Edit and Update operations of students details
-        [HttpGet]
-        public async Task<IActionResult> EditStudent(int studentId)
-        {
-            var student = await _studentsInfoServices.GetStudentByIdAsync(studentId);
-
-            if (student == null)
-                return NotFound();
-
-            //It automatically gives the department details in dropdown of view page
-            //When user clicks select department itshows the names of departments
-            ViewBag.Departments = new SelectList(
-                await _context.Departments.ToListAsync(),
-                "DepartmentId",
-                "DepartmentName",
-                student.DepartmentId
-            );
-
-            return View(student);
-        }
-
-        //Method handle the Request and Response of Edit Student Infos
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditStudent(StudentsPortalInfos model, IFormFile? Photo)
-        {
-            if (!ModelState.IsValid)
-            {
-                // Populate the departments again so dropdown works on validation error
-                ViewBag.Departments = new SelectList(
-                    await _context.Departments.ToListAsync(),
-                    "DepartmentId",
-                    "DepartmentName",
-                    model.DepartmentId
-                );
-
-                return View(model);
-            }
-
-            // Handle photo upload
-            if (Photo != null && Photo.Length > 0)
-            {
-                if (!Photo.ContentType.StartsWith("image/"))
-                {
-                    ModelState.AddModelError("Photo", "Only image files are allowed.");
-                    ViewBag.Departments = new SelectList(
-                        await _context.Departments.ToListAsync(),
-                        "DepartmentId",
-                        "DepartmentName",
-                        model.DepartmentId
-                    );
-                    return View(model);
-                }
-
-                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads/students");
-                if (!Directory.Exists(uploadsFolder))
-                    Directory.CreateDirectory(uploadsFolder);
-
-                var fileName = $"{Guid.NewGuid()}_{Photo.FileName}";
-                var filePath = Path.Combine(uploadsFolder, fileName);
-
-                using var stream = new FileStream(filePath, FileMode.Create);
-                await Photo.CopyToAsync(stream);
-
-                model.PhotoPath = $"/uploads/students/{fileName}";
-            }
-            else
-            {
-                // Keep existing photo if no new photo uploaded
-                var existing = await _studentsInfoServices.GetStudentByIdAsync(model.StudentId);
-                model.PhotoPath = existing?.PhotoPath;
-            }
-
-            // Update student in database
-            await _studentsInfoServices.UpdateStudentsPortalInfosAsync(model);
-
+            // Call service to add student (handles entity mapping & photo upload)
+            var addedStudent = await _studentService.AddStudentAsync(model, Photo);
             return RedirectToAction(nameof(Index));
         }
 
+        //Edit Student Controller
+        // GET: Edit Student
+        [HttpGet]
+        public async Task<IActionResult> EditStudent(int studentId)
+        {
+            // Fetch student from service
+            var student = await _studentService.GetStudentByIdAsync(studentId);
+            if (student == null) return NotFound();
+
+            // Pass student data to ViewModel
+            var model = new Add_EditStudentVm
+            {
+                StudentId = student.StudentId,
+                RegisterNumber = student.RegisterNumber,  
+                StudentName = student.StudentName,
+                DepartmentId = student.DepartmentId,
+                PhotoPath = student.PhotoPath
+            };
+
+            // Get department list for dropdown
+            var departments = await _studentService.GetDepartmentsAsync();
+            ViewBag.Departments = new SelectList(departments, "DepartmentId", "DepartmentName", model.DepartmentId);
+
+            return View(model);
+        }
+
+        //Method handle the Request and Response of Edit Student Infos
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditStudent(Add_EditStudentVm model, IFormFile? photo)
+        {
+            if (!ModelState.IsValid)
+            {
+                var departments = await _studentService.GetDepartmentsAsync();
+                ViewBag.Departments = new SelectList(departments, "DepartmentId", "DepartmentName", model.DepartmentId);
+                return View(model);
+            }
+
+            var updatedStudent = await _studentService.UpdateStudentAsync(model, photo);
+            if (updatedStudent == null)
+                return NotFound();
+            return RedirectToAction(nameof(Index));
+        }
 
         //Delete Student
         [HttpGet]
         public async Task<IActionResult> DeleteStudent(int studentId)
         {
-            var student = await _studentsInfoServices.GetStudentByIdAsync(studentId);
-            if (student == null)
-            {
-                return NotFound();
-            }
-
-            return View(student);
-        }
-
-        //Delete Post method
-
-        [HttpPost, ActionName("DeleteStudent")]
-        [ValidateAntiForgeryToken]
-
-        public async Task<IActionResult> DeleteConfirmed(int studentId)
-        {
-            await _studentsInfoServices.DeleteStudentsPortalInfosAsync(studentId);
-            return RedirectToAction(nameof(Index));
-        }
-
-        //Get Dashboard
-        [HttpGet]
-        public async Task<IActionResult> Dashboard()//Get Dashboard
-        {
-            var model = await _studentsInfoServices.GetStudentsDashboardAsync();
-            return View(model);
-        }
-
-        //Upload Photo
-        [HttpGet]
-        public IActionResult UploadPhoto(int studentId)
-        {
-            ViewBag.StudentId = studentId;
-            return View();
-        }
-
-        //Upload photo Post
-        [HttpPost]
-        public async Task<IActionResult> UploadPhoto([FromForm] int studentId, [FromForm] IFormFile photo)
-        {
-            if (photo == null || photo.Length == 0)
-                return Json(new { success = false, message = "Please select a photo" });
-
-            var student = await _studentsInfoServices.GetStudentByIdAsync(studentId);
-            if (student == null)
-                return Json(new { success = false, message = "Student not found" });
-
-            var allowedTypes = new[] { ".jpg", ".jpeg", ".png", ".webp" };//supports only four formats of photo
-            var ext = Path.GetExtension(photo.FileName).ToLower();//convert to lowercase to avoid case sensitivity issues
-            if (!allowedTypes.Contains(ext))
-                return Json(new { success = false, message = "Only JPG or PNG or Webp  allowed" });
-
-            await _studentsInfoServices.UploadStudentPhotoAsync(studentId, photo);
-
-            return Json(new { success = true, message = "Photo uploaded successfully" });
-        }
-
-        //View Photo      
-        [HttpGet]
-        public async Task<IActionResult> ViewPhoto(int id)
-        {
-            var student = await _studentsInfoServices.GetStudentByIdAsync(id);
+            var student = await _studentService.GetStudentByIdAsync(studentId);
             if (student == null) return NotFound();
             return View(student);
         }
+
+        [HttpPost, ActionName("DeleteStudent")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteConfirmed(int studentId)
+        {
+            await _studentService.DeleteStudentAsync(studentId);
+            return RedirectToAction(nameof(Index));
+        }
+
+        //CRUD Operations Finished
+
+        //------- Papers Function -----
+
         //All for Add Papers to Departments
-        private void LoadDepartments()
+        //without this method list of departments not shown
+        private void LoadDepartments() //For dropdown of datas for department names
         {
             //Take the Department name and Id from Db mysql it already stored the values for it
             // Load departments from DB to ViewBag for dropdown
@@ -385,6 +171,7 @@ namespace Students_Portal_App.Controllers
             return View();
         }
 
+        //Add paper post method
         [HttpPost]
         public async Task<IActionResult> AddPaper(AddPaperViewModel model)
         {
@@ -396,7 +183,6 @@ namespace Students_Portal_App.Controllers
             }
 
             //  safety check 
-
             bool departmentExists = await _context.Departments
                 .AnyAsync(d => d.DepartmentId == model.DepartmentId);
 
@@ -406,23 +192,21 @@ namespace Students_Portal_App.Controllers
                 LoadDepartments();
                 return View(model);
             }
-
-            //Fields must match to the Papers ViewModel
-
-            var paper = new DepartmentPapers
-            {
-                PaperCode = model.PaperCode!,
-                PaperTitle = model.PaperTitle!,
-                PaperDescription = model.PaperDescription,
-                CourseName = model.CourseName!,
-                DepartmentId = model.DepartmentId
-            };
+                //Fields must match to the Papers ViewModel
+                var paper = new DepartmentPapers
+                {
+                    PaperCode = model.PaperCode!,
+                    PaperTitle = model.PaperTitle!,
+                    PaperDescription = model.PaperDescription,
+                    CourseName = model.CourseName!,
+                    DepartmentId = model.DepartmentId
+                };
 
             try
             {
                 await _studentsPaperService.AddPaperAsync(paper);
                 //show success message 
-                //Concept here is if i add TempDate it must be added to Razor View 
+                //Concept here is , if i add TempDate it must be added to Razor View 
                 TempData["SuccessMessage"] = "Papers added to Department Successfully";
                 return RedirectToAction("AddPaper");
             }
@@ -434,7 +218,7 @@ namespace Students_Portal_App.Controllers
             }
         }
 
-        //Get Department Papers 
+        //Get Department Papers View papers
         [HttpGet]
         public async Task<IActionResult> GetDepartmentPapersAsync()
         {
@@ -451,13 +235,6 @@ namespace Students_Portal_App.Controllers
             return View(papers);
         }
 
-
-        [HttpGet]
-        public IActionResult SearchStudent()
-        {
-            return View("SearchDepartmentPapers", model: new SearchDepartmentPapersViewModel());
-
-        }
         //Join two tables studentsportalinfos and student papers
         // JOIN PAGE
         [HttpGet]
@@ -473,12 +250,12 @@ namespace Students_Portal_App.Controllers
 
             ViewBag.CurrentPage = page;
             ViewBag.TotalPages = (int)Math.Ceiling(total / (double)pageSize);
-
             return View(data);
         }
 
-        // Show the form to add scholarship
+ //.... student papers details .... finished
 
+        // Show the form to add scholarship
         [HttpGet]
         public async Task<IActionResult> ScholarshipsList()
         {
@@ -515,6 +292,31 @@ namespace Students_Portal_App.Controllers
             return RedirectToAction("Dashboard");
         }
 
+        //Student Dashboard controller
+        [HttpGet]
+        public async Task<IActionResult> Dashboard(string regno)
+        {
+            StudentDashboardVm? dashboardVm = null;
+
+            if (!string.IsNullOrWhiteSpace(regno))
+            {
+                dashboardVm = await _dashboardService.GetStudentDashboardAsync(regno);
+            }
+
+            // If dashboardVm is null, create an empty model to prevent null refs in view
+            if (dashboardVm == null)
+            {
+                dashboardVm = new StudentDashboardVm
+                {
+                    Student = new StudentsPortalInfos(), // Empty student
+                    Papers = new List<DepartmentPapers>(),
+                    Scholarships = new List<StudentScholarship>(),
+                    MonthlyAttendance = new List<Attendance>()
+                };
+            }
+
+            return View(dashboardVm);
+        }
     }
 }
 

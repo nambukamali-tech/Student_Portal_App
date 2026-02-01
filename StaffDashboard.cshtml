@@ -1,0 +1,272 @@
+﻿@using Students_Portal_App.DTOs
+@model Students_Portal_App.ViewModels.StaffDashboardViewModel
+
+@{
+    ViewData["Title"] = "Staff Dashboard";
+
+    var attendance = Model.AttendanceSummary;
+
+    var activeTodayCount = attendance.ActiveCount;
+    var inactiveTodayCount = attendance.InactiveCount;
+    var activeTodayNames = attendance.ActiveNames;
+    var inactiveTodayNames = attendance.InactiveNames;
+    var departmentToday = attendance.Departments;
+
+    var activeMonthlyCount = attendance?.MonthlyPresentCount ?? 0;
+    var inactiveMonthlyCount = attendance?.MonthlyAbsentCount ?? 0;
+    var activeMonthlyNames = attendance?.MonthlyPresentNames ?? new List<string>();
+    var inactiveMonthlyNames = attendance?.MonthlyAbsentNames ?? new List<string>();
+    var departmentMonthly = attendance.MonthlyDepartments;
+
+    var totalStudents = Model.TotalStudents;
+}
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+<style>
+    .card-box {
+        border-radius: 16px;
+        box-shadow: 0 8px 24px rgba(0,0,0,.06);
+    }
+
+    .legend-container .d-flex {
+        font-size: 14px;
+        margin-bottom: 6px;
+    }
+
+    .legend-container i {
+        cursor: pointer;
+        color: #6c757d;
+    }
+
+    .popover-body {
+        max-height: 150px;
+        overflow-y: auto;
+    }
+</style>
+
+<div class="row mb-4">
+
+    <div class="col-md-6">
+        <div class="card card-box p-4">
+            <h5>Students Status</h5>
+            <div class="d-flex justify-content-between mb-3 flex-wrap">
+                <p>Total Students: <span class="fw-bold text-primary">@totalStudents</span></p>
+                <div>
+                    <input type="radio" id="statusToday" name="statusType" value="current" checked />
+                    <label for="statusToday" class="me-2">Today</label>
+
+                    <input type="radio" id="statusMonthly" name="statusType" value="monthly" />
+                    <label for="statusMonthly">Current Month</label>
+                </div>
+            </div>
+
+            <select id="departmentFilter" class="form-select w-50 mb-2">
+                <option value="">All Departments</option>
+                @foreach (var dept in Model.Departments)
+                {
+                    <option value="@dept">@dept</option>
+                }
+            </select>
+
+            <canvas id="studentsStatusChart" style="max-height:150px"></canvas>
+            <div id="studentsStatusLegends" class="mt-3 legend-container"></div>
+        </div>
+    </div>
+
+</div>
+
+<div class="card card-box p-4">
+    <div class="d-flex justify-content-between mb-3 flex-wrap gap-2">
+        <h5>Students List</h5>
+        <div class="btn-group flex-wrap">
+            
+            <a asp-controller="Dashboard" asp-action="Dashboard" class="btn btn-primary">View Dashboard</a>
+        </div>
+    </div>
+
+    <table class="table table-hover align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Student ID</th>
+                <th>Profile</th>
+                <th>Register No</th>
+                <th>Status</th>
+                <th>Name</th>
+                <th>Department</th>
+                <th>In Time</th>
+                <th>Out Time</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var student in Model.StudentsAttendance)
+            {
+                <tr id="student-row-@student.StudentId">
+                    <td>@student.StudentId</td>
+                    <td>
+                        <img src="@student.PhotoPath" class="border shadow-sm" style="width:45px;height:45px;border-radius:50%;object-fit:cover;" onerror="this.src='/images/default-user.png';" />
+                    </td>
+                    <td>@student.RegisterNumber</td>
+                    <td>@(student.InTime.HasValue ? "Present" : "Absent")</td>
+                    <td>@student.StudentName</td>
+                    <td>@student.DepartmentName</td>
+                    <td>@(student.InTime?.ToString("hh:mm tt") ?? "-")</td>
+                    <td>@(student.OutTime?.ToString("hh:mm tt") ?? "-")</td>
+                    <td class="d-flex gap-1">
+                        
+                        <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#attendanceModal-@student.StudentId"><i class="fas fa-user-check"></i></button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@foreach (var student in Model.StudentsAttendance)
+{
+    <div class="modal fade" id="attendanceModal-@student.StudentId" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form class="attendance-form" data-student-id="@student.StudentId">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Mark Attendance - @student.StudentName - @DateTime.Today:yyyy-MM-dd</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label>In Time</label>
+                        <input type="time" name="inTime" class="form-control mb-2" value="@student.InTime?.ToString("HH:mm")" />
+                        <label>Out Time</label>
+                        <input type="time" name="outTime" class="form-control" value="@student.OutTime?.ToString("HH:mm")" />
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-success">Save Attendance</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    $(function(){
+
+        // Prepare attendance data
+        const data = {
+            current: {
+                count: [@(activeTodayCount), @(inactiveTodayCount)],
+                names: [
+                    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(activeTodayNames)),
+                    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(inactiveTodayNames))
+                ],
+                dept: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(departmentToday)),
+                labels: ['Active', 'Inactive'],
+                colors: ['#ffc107', '#dc3545']
+            },
+            monthly: {
+                count: [@(activeMonthlyCount), @(inactiveMonthlyCount)],
+                names: [
+                    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(activeMonthlyNames)),
+                    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(inactiveMonthlyNames))
+                ],
+                dept: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(departmentMonthly)),
+                labels: ['Present', 'Absent'],
+                colors: ['#6f42c1', '#000']
+            }
+        };
+
+        let currentType = 'current';
+
+        // Students Status Chart
+        const statusChart = new Chart(document.getElementById("studentsStatusChart").getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: data[currentType].labels,
+                datasets: [{ data: data[currentType].count, backgroundColor: data[currentType].colors }]
+            },
+            options: { plugins: { legend: { display: false } } }
+        });
+
+        // Build legends
+        function updateStatusLegend(type){
+            const [active, inactive] = data[type].count;
+            const [activeNames, inactiveNames] = data[type].names;
+            const colors = data[type].colors;
+            const container = $("#studentsStatusLegends").empty();
+
+            function row(label, count, color, names){
+                const el = $(`
+                    <div class="d-flex align-items-center mb-1">
+                        <span style="width:15px;height:15px;background:${color};display:inline-block;margin-right:8px;"></span>
+                        <span>${label}: ${count}</span>
+                        <i class="fas fa-info-circle ms-2" data-bs-toggle="popover" data-bs-html="true"></i>
+                    </div>
+                `);
+                el.find("i").attr("data-bs-content", names.length ? names.join("<br>") : `Total: ${count}`);
+                container.append(el);
+            }
+
+            row(data[type].labels[0], active, colors[0], activeNames);
+            row(data[type].labels[1], inactive, colors[1], inactiveNames);
+            $('[data-bs-toggle="popover"]').popover({ trigger: 'hover', html: true });
+        }
+
+        updateStatusLegend(currentType);
+        buildDepartmentChart(data[currentType].dept);
+
+        $('input[name="statusType"]').change(function(){
+            currentType = this.value;
+            statusChart.data.labels = data[currentType].labels;
+            statusChart.data.datasets[0].data = data[currentType].count;
+            statusChart.data.datasets[0].backgroundColor = data[currentType].colors;
+            statusChart.update();
+            updateStatusLegend(currentType);
+            buildDepartmentChart(data[currentType].dept);
+        });
+
+        $('#departmentFilter').change(function(){
+            const dept = $(this).val();
+            $.get('/Student/GetDepartmentStatus', { department: dept }, function(res){
+                data.current.count = [res.ActiveCount,res.InactiveCount];
+                data.current.names = [res.ActiveNames,res.InactiveNames];
+                statusChart.data.datasets[0].data = data.current.count;
+                statusChart.update();
+                updateStatusLegend("current");
+            });
+        });
+        $('.attendance-form').submit(function(e){
+            e.preventDefault();
+            const form = $(this);
+            const studentId = form.data('student-id');
+            const inTime = form.find('[name="inTime"]').val();
+            const outTime = form.find('[name="outTime"]').val();
+
+            $.post('/Student/MarkAttendance', { StudentId: studentId, InTime: inTime, OutTime: outTime }, function(result){
+                $.get('/Student/GetStudentsStatus', function(updatedData){
+                    if(currentType==="current"){
+                        data.current.count=[updatedData.AttendanceSummary.ActiveCount, updatedData.AttendanceSummary.InactiveCount];
+                        data.current.names=[updatedData.AttendanceSummary.ActiveNames, updatedData.AttendanceSummary.InactiveNames];
+                    }
+                    if(currentType==="monthly"){
+                        data.monthly.count=[updatedData.AttendanceSummary.MonthlyPresentCount, updatedData.AttendanceSummary.MonthlyAbsentCount];
+                        data.monthly.names=[updatedData.AttendanceSummary.MonthlyPresentNames, updatedData.AttendanceSummary.MonthlyAbsentNames];
+                    }
+                    statusChart.data.datasets[0].data = data[currentType].count;
+                    statusChart.update();
+                    updateStatusLegend(currentType);
+
+                    const deptData = currentType==='current' ? updatedData.AttendanceSummary.Departments : updatedData.AttendanceSummary.MonthlyDepartments;
+                    buildDepartmentChart(deptData);
+
+                    form.closest('.modal').modal('hide');
+                });
+            });
+        });
+    });
+</script>

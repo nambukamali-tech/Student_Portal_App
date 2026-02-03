@@ -10,46 +10,29 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
 <style>
-    .card-box { border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,.06);}
-    .legend-container .d-flex { font-size:14px; margin-bottom:6px;}
-    .legend-container i { cursor:pointer; color:#6c757d;}
-    .popover-body { max-height:150px; overflow-y:auto;}
-    img.profile-pic { width:45px;height:45px;border-radius:50%;object-fit:cover; }
+    .card-box { border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,.06); }
+    .legend-container .d-flex { font-size:14px; margin-bottom:6px; }
+    .legend-container i { cursor:pointer; color:#6c757d; }
+    .popover-body { max-height:150px; overflow-y:auto; }
+    img.profile-pic { width:45px; height:45px; border-radius:50%; object-fit:cover; }
 </style>
 
 <div class="row mb-4">
-    <div class="col-md-6">
-        <h5>STAFF DASHBOARD</h5>
+    <div class="col-12 mb-4">
+        <h5>STAFF DASHBOARD - @Model.StaffDepartment Department</h5>
         <div class="card card-box p-4">
             <h5>Students Status</h5>
 
-
             <div class="mb-2">
-                <input type="radio" id="statusToday" name="statusType" value="current" checked />
+                <input type="radio" id="statusToday" name="statusType" value="today" checked />
                 <label for="statusToday" class="me-2">Today</label>
 
                 <input type="radio" id="statusMonthly" name="statusType" value="monthly" />
                 <label for="statusMonthly">Current Month</label>
             </div>
 
-            <select id="departmentFilter" class="form-select w-50 mb-3">
-                <option value="">All Departments</option>
-                @foreach (var dept in Model.Departments)
-                {
-                    <option value="@dept">@dept</option>
-                }
-            </select>
-
-            <canvas id="studentsStatusChart" style="max-height:150px"></canvas>
+            <canvas id="studentsStatusChart" style="max-height:200px"></canvas>
             <div id="studentsStatusLegends" class="mt-3 legend-container"></div>
-        </div>
-    </div>
-
-    <div class="col-md-6">
-        <div class="card card-box p-4">
-            <h5>Department Details</h5>
-            <canvas id="departmentChart" style="max-height:150px"></canvas>
-            <div id="departmentLegends" class="mt-3 legend-container"></div>
         </div>
     </div>
 </div>
@@ -77,7 +60,7 @@
         <tbody>
             @foreach (var student in Model.StudentsAttendance)
             {
-                <tr>
+                <tr data-student-id="@student.StudentId">
                     <td>@student.StudentId</td>
                     <td><img src="@student.PhotoPath" class="profile-pic" onerror="this.src='/images/default-user.png';" /></td>
                     <td>@student.RegisterNumber</td>
@@ -104,7 +87,7 @@
             <div class="modal-content">
                 <form class="attendance-form" data-student-id="@student.StudentId">
                     <div class="modal-header">
-                        <h5 class="modal-title">Mark Attendance - @student.StudentName - @DateTime.Today.ToString("yyy-MM-dd")</h5>
+                        <h5 class="modal-title">Mark Attendance - @student.StudentName - @DateTime.Today.ToString("yyyy-MM-dd")</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
@@ -128,90 +111,85 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-    const totalStudentsfromDB = @Model.TotalStudents; //newly added
-$(function(){
+$(function() {
+    const totalStudents = @Model.TotalStudents;
 
-    const students = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+    // Prepare initial data
+    let studentsToday = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
         Model.StudentsAttendance.Select(s => new {
-            StudentName = s.StudentName ?? "Unknown",
-            Department = s.DepartmentName ?? "Unknown",
-            StudentStatus = s.StudentStatus ?? "Inactive"
+            s.StudentId,
+            s.StudentName,
+            s.StudentStatus,
+            s.InTime,
+            s.OutTime
         }).ToList()
     ));
 
-    const monthlyStudents = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
-        Model.MonthlyStudentsAttendance.Select(s => new
-            {
-            StudentName = s.StudentName ?? "Unknown",
-            Department = s.DepartmentName ?? "Unknown",
-            StudentStatus = s.StudentStatus ?? "Inactive"
+    let studentsMonthly = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+        Model.MonthlyStudentsAttendance.Select(s => new {
+            s.StudentId,
+            s.StudentName,
+            s.StudentStatus,
+            s.InTime,
+            s.OutTime
         }).ToList()
     ));
 
-    let currentStudents = students; 
+    let currentType = 'today';
+    let currentStudents = studentsToday;
 
-    let chartLabelsToday = ['Active','Inactive'];
-    let chartColorsToday = ['#ffc107','#dc3545'];
+    const chartLabelsToday = ['Active', 'Inactive'];
+    const chartColorsToday = ['#ffc107', '#dc3545'];
 
-    let chartLabelsMonthly = ['Present','Absent'];
-    let chartColorsMonthly = ['#8a2be2','#000000'];
+    const chartLabelsMonthly = ['Present', 'Absent'];
+    const chartColorsMonthly = ['#8a2be2', '#000000'];
 
-    function getCounts(filteredStudents){
-        return [
-            filteredStudents.filter(s => s.StudentStatus==='Active').length,
-            filteredStudents.filter(s => s.StudentStatus==='Inactive').length
-        ];
+        function getCounts(data, type) {
+        if (type === 'today') {
+            return [
+                data.filter(s => s.InTime).length,                 
+                data.filter(s => !s.InTime).length                 
+            ];
+        } else {
+            return [
+                data.filter(s => s.InTime).length,                 
+                data.filter(s => !s.InTime).length
+            ];
+        }
     }
 
-    function getCountsMonthly(filteredStudents){
-        return [
-            filteredStudents.filter(s => s.StudentStatus==='Active').length,
-            filteredStudents.filter(s => s.StudentStatus==='Inactive').length
-        ];
-    }
 
     let statusChart = new Chart(document.getElementById("studentsStatusChart").getContext('2d'), {
-        type:'doughnut',
+        type: 'doughnut',
         data: {
             labels: chartLabelsToday,
-            datasets: [{ data: getCounts(students), backgroundColor: chartColorsToday }]
+            datasets: [{
+                data: getCounts(currentStudents, 'today'),
+                backgroundColor: chartColorsToday
+            }]
         },
-        options:{ plugins:{ legend:{ display:false } } }
+        options: { plugins: { legend: { display: false } }, responsive: true, maintainAspectRatio: false }
     });
 
-    //update legend
-        function updateLegend(filteredStudents){
+       function updateLegend(data, type) {
         const container = $("#studentsStatusLegends").empty();
-        const isMonthly = $('input[name="statusType"]:checked').val() === "monthly";
+        const labels = type === 'monthly' ? chartLabelsMonthly : chartLabelsToday;
+        const colors = type === 'monthly' ? chartColorsMonthly : chartColorsToday;
 
-        const labels = isMonthly ? chartLabelsMonthly : chartLabelsToday;
-        const colors = isMonthly ? chartColorsMonthly : chartColorsToday;
+        const activeCount = data.filter(s => s.InTime).length;
+        const inactiveCount = data.filter(s => !s.InTime).length;
 
-        const selectedDept = $('#departmentFilter').val();
-
-        const activeCount = filteredStudents.filter(s => s.StudentStatus === 'Active').length;
-        const inactiveCount = filteredStudents.filter(s => s.StudentStatus === 'Inactive').length;
-        const attendanceCount = activeCount + inactiveCount;
-        const notMarkedCount = Math.max(totalStudentsfromDB - attendanceCount, 0);
-
-        labels.forEach((label,i)=>{
-            const count = (label === 'Active' || label === 'Present')
-                ? activeCount
-                : inactiveCount;
-
-            const names = filteredStudents
-                .filter(s =>
-                    (label === 'Active' || label === 'Present')
-                        ? s.StudentStatus === 'Active'
-                        : s.StudentStatus === 'Inactive'
-                )
+        labels.forEach((label, i) => {
+            const count = i === 0 ? activeCount : inactiveCount;
+            const names = data
+                .filter(s => i === 0 ? s.InTime : !s.InTime)
                 .map(s => s.StudentName);
 
             const el = $(`
                 <div class="d-flex align-items-center mb-1">
                     <span style="width:15px;height:15px;background:${colors[i]};display:inline-block;margin-right:8px;"></span>
                     <span>${label}: ${count}</span>
-                    <i class="fas fa-info-circle ms-2" data-bs-toggle="popover" data-bs-html="true"></i>
+                    <i class="fas fa-info-circle ms-2" data-bs-toggle="popover"></i>
                 </div>
             `);
 
@@ -223,61 +201,23 @@ $(function(){
             container.append(el);
         });
 
-        if (!selectedDept) {
-            container.append(`
-                <div class="d-flex align-items-center mb-1">
-                    <span style="width:15px;height:15px;background:#6c757d;display:inline-block;margin-right:8px;"></span>
-                    <span>Not Marked: ${notMarkedCount}</span>
-                    <i class="fas fa-info-circle ms-2"
-                       data-bs-toggle="popover"
-                       data-bs-html="true"
-                       data-bs-content="Students with no attendance entry">
-                    </i>
-                </div>
-            `);
-        }
-
-        const totalCount = selectedDept ? filteredStudents.length : totalStudentsfromDB;
-        const totalLabel = selectedDept ? `Total (${selectedDept})` : `Total`;
-
-        container.append(`
-            <div class="d-flex align-items-center mt-2 fw-bold">
-                <span>${totalLabel}: ${totalCount}</span>
-            </div>
-        `);
-
-        $('[data-bs-toggle="popover"]').popover({ trigger:'hover', html:true });
+        container.append(`<div class="mt-2 fw-bold">Total: ${data.length}</div>`);
+        $('[data-bs-toggle="popover"]').popover({ trigger: 'hover', html: true });
     }
 
+    // Initialize legend
+    updateLegend(currentStudents, 'today');
 
-    updateLegend(students);
-
-    function applyFilters(){
-        const selectedDept = $('#departmentFilter').val();
-        const filtered = selectedDept
-            ? currentStudents.filter(s => s.Department === selectedDept)
-            : currentStudents;
-
-        const isMonthly = $('input[name="statusType"]:checked').val() === "monthly";
-
-        statusChart.data.datasets[0].data = isMonthly
-            ? getCountsMonthly(filtered)
-            : getCounts(filtered);
-
-        statusChart.data.datasets[0].backgroundColor = isMonthly ? chartColorsMonthly : chartColorsToday;
-        statusChart.data.labels = isMonthly ? chartLabelsMonthly : chartLabelsToday;
-
+    // Radio switch
+    $('input[name="statusType"]').change(function() {
+        currentType = this.value === 'monthly' ? 'monthly' : 'today';
+        currentStudents = currentType === 'monthly' ? studentsMonthly : studentsToday;
+        statusChart.data.datasets[0].data = getCounts(currentStudents, currentType);
+        statusChart.data.datasets[0].backgroundColor = currentType === 'monthly' ? chartColorsMonthly : chartColorsToday;
+        statusChart.data.labels = currentType === 'monthly' ? chartLabelsMonthly : chartLabelsToday;
         statusChart.update();
-        updateLegend(filtered);
-    }
-
-    $('input[name="statusType"]').change(function(){
-        currentStudents = this.value === "monthly" ? monthlyStudents : students;
-        applyFilters();
+        updateLegend(currentStudents, currentType);
     });
-
-    $('#departmentFilter').change(applyFilters);
-    
 
     $('.attendance-form').submit(function(e){
         e.preventDefault();
@@ -286,40 +226,44 @@ $(function(){
         const inTime = form.find('[name="inTime"]').val();
         const outTime = form.find('[name="outTime"]').val();
 
-        $.post('/Staff/MarkAttendance',{StudentId:studentId,InTime:inTime,OutTime:outTime},function(){
-            location.reload();
+        $.ajax({
+            type: "POST",
+            url: "/Staff/MarkAttendance",
+            data: { StudentId: studentId, InTime: inTime, OutTime: outTime },
+            success: function(response){
+                if(response.success){
+                    const targetList = currentType === 'monthly' ? studentsMonthly : studentsToday;
+                    const studentIndex = targetList.findIndex(s => s.StudentId == studentId);
+                    if(studentIndex !== -1){
+                        targetList[studentIndex].InTime = inTime;
+                        targetList[studentIndex].OutTime = outTime;
+                        targetList[studentIndex].StudentStatus = inTime ? (currentType==='monthly' ? 'Present' : 'Active') : (currentType==='monthly' ? 'Absent' : 'Inactive');
+                    }
+
+                    // Update chart and legend
+                    statusChart.data.datasets[0].data = getCounts(targetList, currentType);
+                    statusChart.update();
+                    updateLegend(targetList, currentType);
+
+                        const row = $(`tr[data-student-id='${studentId}']`);
+                     if(row.length) 
+                     {
+                     row.find('td:nth-child(4)').text(inTime ? "Present" : "Absent");
+                     row.find('td:nth-child(7)').text(inTime ? inTime : "-");
+                     row.find('td:nth-child(8)').text(outTime ? outTime : "-");
+                     }         
+                    form.closest('.modal').modal('hide');
+                    alert('Attendance saved successfully!');
+                } else {
+                    alert('Failed: ' + response.message);
+                }
+            },
+            error: function(xhr){
+                alert('Error: ' + (xhr.responseJSON?.message || xhr.statusText));
+            }
         });
     });
-
-    const departments = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AttendanceSummary.Departments ?? new List<Students_Portal_App.DTOs.DepartmentAttendanceDto>()));
-
-    function buildDepartmentChart(depts){
-        if(!depts || !depts.length) return;
-        const labels = depts.map(d => d.DepartmentName);
-        const counts = depts.map(d => d.Count);
-        const colors = labels.map((_,i)=>`hsl(${i*50%360},70%,50%)`);
-        if(window.deptChart) window.deptChart.destroy();
-        window.deptChart = new Chart(document.getElementById("departmentChart").getContext('2d'),{
-            type:'doughnut',
-            data:{ labels, datasets:[{data:counts,backgroundColor:colors}] },
-            options:{ plugins:{ legend:{ display:false } } }
-        });
-
-        const legend = $("#departmentLegends").empty();
-        depts.forEach((d,i)=>{
-            const row = $(`
-                <div class="d-flex align-items-center mb-1">
-                    <span style="width:15px;height:15px;background:${colors[i]};display:inline-block;margin-right:8px;"></span>
-                    <span>${d.DepartmentName}: ${d.Count}</span>
-                    <i class="fas fa-info-circle ms-2" data-bs-toggle="popover" data-bs-html="true"></i>
-                </div>
-            `);
-            row.find("i").attr("data-bs-content", d.StudentNames.join("<br>"));
-            legend.append(row);
-        });
-        $('[data-bs-toggle="popover"]').popover({ trigger:'hover', html:true });
-    }
-    buildDepartmentChart(departments);
-
 });
 </script>
+
+

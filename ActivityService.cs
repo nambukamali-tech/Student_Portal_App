@@ -16,12 +16,9 @@ namespace Students_Portal_App.Services
             _context = context;
             _dbAccessorService = dbAccessorService;
         }
-        //Business logic for Mark Attendance page
         public async Task<AttendanceResultDto> MarkAttendanceAsync(int studentId, DateTime? inTime, DateTime? outTime)
         {
             var today = DateTime.Today;
-
-            // Add or update today's attendance
             var attendance = await _context.Attendances
                 .FirstOrDefaultAsync(a => a.StudentId == studentId && a.AttendanceDate == today);
 
@@ -51,8 +48,6 @@ namespace Students_Portal_App.Services
 
             await _context.SaveChangesAsync();
 
-            // Datas made here and send to mark attendance page then used for students details display
-
             int totalStudents = await _context.StudentsPortalInfos.CountAsync();
 
             var activeIds = await _context.Attendances
@@ -63,7 +58,6 @@ namespace Students_Portal_App.Services
 
             int activeCount = activeIds.Count;
             int inactiveCount = totalStudents - activeCount;
-
             return new AttendanceResultDto
             {
                 ActiveCount = activeCount,
@@ -71,132 +65,165 @@ namespace Students_Portal_App.Services
                 ActiveIds = activeIds
             };
         }
-        //Business logic for Index page
+
+        //Index method
         public async Task<IndexViewModel> GetIndexAsync()
         {
             var today = DateTime.Today;
             var month = today.Month;
             var year = today.Year;
 
-            // Total students from table (studentsportalinfos)
-            int totalStudents = await _dbAccessorService.GetTotalstudentCount();//Asynchronously count the total students
+            // Total students
+            int totalStudents = await _dbAccessorService.GetTotalstudentCount();
 
-            // Active students today
-            var activeIdsToday = await _context.Attendances
-                .Where(a => a.AttendanceDate == today && a.InTime != null)
-                .Select(a => a.StudentId)
-                
+            var studentsToday = await _context.StudentsPortalInfos
+                .Include(s => s.Department)
+                .Include(s => s.Attendances)
+                .Select(s => new StudentsAttendanceDto
+                {
+                    StudentId = s.StudentId,
+                    PhotoPath = s.PhotoPath,
+                    StudentName = s.StudentName!,
+                    DepartmentName = s.Department != null ? s.Department.DepartmentName : "",
+                    RegisterNumber = s.RegisterNumber!,
+                    StudentStatus = s.Attendances.Any(a => a.AttendanceDate == today && a.InTime.HasValue) ? "Active" : "Inactive",
+                    InTime = s.Attendances.Where(a => a.AttendanceDate == today).Select(a => a.InTime).FirstOrDefault(),
+                    OutTime = s.Attendances.Where(a => a.AttendanceDate == today).Select(a => a.OutTime).FirstOrDefault()
+                })
                 .ToListAsync();
 
-            int activeCount = activeIdsToday.Count;
-            int inactiveCount = totalStudents - activeCount;
-
-            // Load all students with their attendance for today
-            var students = await _context.StudentsPortalInfos
-      .Include(s => s.Department)
-      .Include(s => s.Attendances)
-      .Select(s => new StudentsAttendanceDto
-      {
-          StudentId = s.StudentId,
-          PhotoPath = s.PhotoPath,
-          StudentName = s.StudentName!,
-          DepartmentName = s.Department != null ? s.Department.DepartmentName : "",
-          RegisterNumber = s.RegisterNumber!,
-
-          // Compute status from attendance today
-          StudentStatus = s.Attendances
-              .Any(a => a.AttendanceDate == today && a.InTime.HasValue)
-              ? "Active"
-              : "Inactive",
-
-          // InTime / OutTime only if attendance exists today
-          InTime = s.Attendances
-              .Where(a => a.AttendanceDate == today)
-              .Select(a => a.InTime)
-              .FirstOrDefault(),
-          OutTime = s.Attendances
-              .Where(a => a.AttendanceDate == today)
-              .Select(a => a.OutTime)
-              .FirstOrDefault()
-      })
-      .ToListAsync();
-
-            // Monthly attendance
-            var monthlyPresentIds = await _context.Attendances
-                .Where(a => a.AttendanceDate.Month == month && a.AttendanceDate.Year == year && a.InTime != null)
-                .Select(a => a.StudentId)
-                .Distinct()
+            var studentsMonthly = await _context.StudentsPortalInfos
+                .Include(s => s.Department)
+                .Include(s => s.Attendances)
+                .Select(s => new StudentsAttendanceDto
+                {
+                    StudentId = s.StudentId,
+                    PhotoPath = s.PhotoPath,
+                    StudentName = s.StudentName!,
+                    RegisterNumber = s.RegisterNumber!,
+                    DepartmentName = s.Department != null ? s.Department.DepartmentName : "",
+                    StudentStatus = s.Attendances.Any(a => a.AttendanceDate.Month == month && a.AttendanceDate.Year == year && a.InTime.HasValue)
+                        ? "Present" : "Absent",
+                    InTime = s.Attendances
+                        .Where(a => a.AttendanceDate.Month == month && a.AttendanceDate.Year == year && a.InTime.HasValue)
+                        .Select(a => a.InTime)
+                        .FirstOrDefault(),
+                    OutTime = s.Attendances
+                        .Where(a => a.AttendanceDate.Month == month && a.AttendanceDate.Year == year)
+                        .Select(a => a.OutTime)
+                        .FirstOrDefault()
+                })
                 .ToListAsync();
 
-            int monthlyPresentCount = monthlyPresentIds.Count;
-            int monthlyAbsentCount = totalStudents - monthlyPresentCount;
 
-            // Departments Today
-            // Get all departments from DB
+            var activeIdsToday = studentsToday.Where(s => s.StudentStatus == "Active").Select(s => s.StudentId).ToList();
+
+
             var allDepartments = await _context.Departments.ToListAsync();
 
-            // Departments Today (include all, even if 0 active)
             var departmentsToday = allDepartments.Select(d =>
             {
-                var studentsInDept = students.Where(s => s.DepartmentName == d.DepartmentName).ToList();
+                var studentsInDept = studentsToday.Where(s => s.DepartmentName == d.DepartmentName).ToList();
                 var activeStudents = studentsInDept.Where(s => activeIdsToday.Contains(s.StudentId)).ToList();
 
                 return new DepartmentAttendanceDto
                 {
                     DepartmentName = d.DepartmentName,
-                    Count = activeStudents.Count,
+                    Count = activeStudents.Count, // total students
                     StudentNames = activeStudents.Select(s => s.StudentName).ToList()
                 };
             }).ToList();
 
-            // Departments Monthly (similar logic)
             var departmentsMonthly = allDepartments.Select(d =>
             {
-                var studentsInDept = students.Where(s => s.DepartmentName == d.DepartmentName).ToList();
-                var monthlyPresentStudents = studentsInDept.Where(s => monthlyPresentIds.Contains(s.StudentId)).ToList();
+                var studentsInDept = studentsMonthly.Where(s => s.DepartmentName == d.DepartmentName).ToList();
+                var monthlyPresentStudents = studentsInDept.Where(s => s.StudentStatus == "Present").ToList();
 
                 return new DepartmentAttendanceDto
                 {
                     DepartmentName = d.DepartmentName,
-                    Count = monthlyPresentStudents.Count,
+                    Count = monthlyPresentStudents.Count, // total students in dept
                     StudentNames = monthlyPresentStudents.Select(s => s.StudentName).ToList()
                 };
             }).ToList();
 
-
-            // Attendance Summary
             var summary = new AttendanceResultDto
             {
-                ActiveCount = activeCount,
-                InactiveCount = inactiveCount,
-                ActiveIds = activeIdsToday,
-                ActiveNames = students.Where(s => activeIdsToday.Contains(s.StudentId)).Select(s => s.StudentName).ToList(),
-                InactiveNames = students.Where(s => !activeIdsToday.Contains(s.StudentId)).Select(s => s.StudentName).ToList(),
+                ActiveCount = activeIdsToday.Count,
+                InactiveCount = totalStudents - activeIdsToday.Count,
+                ActiveNames = studentsToday.Where(s => s.StudentStatus == "Active").Select(s => s.StudentName).ToList(),
+                InactiveNames = studentsToday.Where(s => s.StudentStatus == "Inactive").Select(s => s.StudentName).ToList(),
 
-                MonthlyPresentCount = monthlyPresentCount,
-                MonthlyAbsentCount = monthlyAbsentCount,
-                MonthlyPresentIds = monthlyPresentIds,
-                Departments = departmentsToday,           // Current
-                MonthlyPresentNames = students
-    .Where(s => monthlyPresentIds.Contains(s.StudentId))
-    .Select(s => s.StudentName)
-    .ToList(),
+                MonthlyActiveCount = studentsMonthly.Count(s => s.StudentStatus == "Present"),
+                MonthlyInactiveCount = studentsMonthly.Count(s => s.StudentStatus == "Absent"),
+                MonthlyActiveNames = studentsMonthly.Where(s => s.StudentStatus == "Present").Select(s => s.StudentName).ToList(),
+                MonthlyInactiveNames = studentsMonthly.Where(s => s.StudentStatus == "Absent").Select(s => s.StudentName).ToList(),
 
-                MonthlyAbsentNames = students
-    .Where(s => !monthlyPresentIds.Contains(s.StudentId))
-    .Select(s => s.StudentName)
-    .ToList(),
-
-                MonthlyDepartments = departmentsMonthly   // Monthly
+                Departments = departmentsToday,
+                MonthlyDepartments = departmentsMonthly
             };
+
+            var deptList = allDepartments.Select(d => d.DepartmentName).ToList();
+
             return new IndexViewModel
             {
-
                 TotalStudents = totalStudents,
-                StudentsAttendance = students,
-                AttendanceSummary = summary
+                StudentsAttendance = studentsToday,
+                MonthlyStudentsAttendance = studentsMonthly,
+                AttendanceSummary = summary,
+                Departments = deptList
             };
         }
+
+        public async Task<AttendanceResultDto> GetAttendanceByDepartmentAsync(string departmentName)
+        {
+            var today = DateTime.Today;
+            var month = today.Month;
+            var year = today.Year;
+
+            var students = await _context.StudentsPortalInfos
+                .Include(s => s.Department)
+                .Include(s => s.Attendances)
+                .Where(s => string.IsNullOrEmpty(departmentName)
+                    || s.Department.DepartmentName == departmentName)
+                .ToListAsync();
+
+            // ===== TODAY =====
+            var activeToday = students
+                .Where(s => s.Attendances.Any(a =>
+                    a.AttendanceDate == today && a.InTime != null))
+                .ToList();
+
+            var inactiveToday = students.Except(activeToday).ToList();
+
+            // ===== MONTHLY =====
+            var activeMonthly = students
+                .Where(s => s.Attendances.Any(a =>
+                    a.AttendanceDate.Month == month &&
+                    a.AttendanceDate.Year == year &&
+                    a.InTime != null))
+                .ToList();
+
+            var inactiveMonthly = students.Except(activeMonthly).ToList();
+
+
+            return new AttendanceResultDto
+            {
+                // Today
+                ActiveCount = activeToday.Count,
+                InactiveCount = inactiveToday.Count,
+                ActiveNames = activeToday.Select(s => s.StudentName).ToList(),
+                InactiveNames = inactiveToday.Select(s => s.StudentName).ToList(),
+
+                MonthlyActiveCount = activeMonthly.Count,
+                MonthlyInactiveCount = inactiveMonthly.Count,
+                MonthlyActiveNames = activeMonthly.Select(s => s.StudentName).ToList(),
+                MonthlyInactiveNames = inactiveMonthly.Select(s => s.StudentName).ToList()
+            
+            };
+        }
+
+
     }
 }
 

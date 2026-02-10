@@ -175,6 +175,7 @@ public class StudentsCRUDService : IStudentServiceInterface
             }).ToList()
         };
     }
+   
     public async Task<IndexViewModel> GetDashboardDataAsync()
     {
         var totalStudents = await _context.StudentsPortalInfos.CountAsync();
@@ -194,8 +195,6 @@ public class StudentsCRUDService : IStudentServiceInterface
     public async Task<StaffDashboardViewModel> GetStaffDashboardAsync(string staffUserName)
     {
         var today = DateTime.Today;
-
-        // 1️⃣ Get logged-in staff user with department
         var staffUser = await _context.Users
             .Include(u => u.Department)
             .FirstOrDefaultAsync(u => u.UserName == staffUserName);
@@ -242,7 +241,6 @@ public class StudentsCRUDService : IStudentServiceInterface
             };
         }).ToList();
 
-        // 5️⃣ Map Monthly data
         var studentsMonthly = students.Select(s =>
         {
             var attList = monthAttendances.Where(a => a.StudentId == s.StudentId).ToList();
@@ -268,7 +266,7 @@ public class StudentsCRUDService : IStudentServiceInterface
             TotalStudents = students.Count,
             StudentsAttendance = studentsToday,
             MonthlyStudentsAttendance = studentsMonthly,
-            Departments = new List<string> { staffDeptName }, // Only staff department
+            Departments = new List<string> { staffDeptName }, 
             AttendanceSummary = new AttendanceResultDto
             {
                 ActiveCount = activeToday.Count,
@@ -291,11 +289,10 @@ public class StudentsCRUDService : IStudentServiceInterface
     {
         var today = DateTime.Today;
 
-        // Check for attendance for this student for today
         var attendance = await _context.Attendances
             .FirstOrDefaultAsync(a =>
                 a.StudentId == studentId &&
-                a.AttendanceDate == today); // Use AttendanceDate column
+                a.AttendanceDate == today);
 
         if (attendance == null)
         {
@@ -317,5 +314,73 @@ public class StudentsCRUDService : IStudentServiceInterface
 
         await _context.SaveChangesAsync();
     }
+
+
+    //Newly added for dashboard restriction for staff based on departments
+    public async Task<StudentDashboardVm?> GetStudentDashboardAsync(
+       string regNo,
+       string selectedCourse,
+       string? staffUserName,
+       bool isAdmin)
+    {
+        var student = await _context.StudentsPortalInfos
+            .Include(s => s.Department)
+            .FirstOrDefaultAsync(s => s.RegisterNumber == regNo);
+
+        if (student == null)
+            return null;
+
+        // STAFF department validation
+        if (!isAdmin)
+        {
+            if (string.IsNullOrWhiteSpace(staffUserName))
+                return null;
+
+            var staff = await _context.Users
+                .Include(u => u.Department)
+                .FirstOrDefaultAsync(u => u.UserName == staffUserName);
+
+            if (staff == null || staff.DepartmentId == null)
+                return null;
+
+            if (student.DepartmentId != staff.DepartmentId)
+                return null; // invalid department regno
+        }
+
+        var attendance = await _context.Attendances
+            .Where(a => a.StudentId == student.StudentId)
+            .ToListAsync();
+
+        var papers = await _context.DepartmentPapers
+    .Where(p => p.DepartmentId == student.DepartmentId &&
+                (string.IsNullOrEmpty(selectedCourse) || p.CourseName == selectedCourse))
+    .ToListAsync();
+
+        var scholarships = await _context.StudentScholarships
+    .Where(s => s.StudentId == student.StudentId)
+    .ToListAsync();
+
+
+
+        return new StudentDashboardVm
+        {
+            RegNo = student.RegisterNumber,
+            StudentName = student.StudentName,
+            DepartmentName = student.Department!.DepartmentName,
+            Papers = papers,
+            PhotoPath = student.PhotoPath,
+            Scholarships = scholarships,
+
+            SelectedCourse = selectedCourse,
+            Courses = new List<string> { "BSc", "MSc", "PhD" },
+
+            MonthlyAttendance = attendance,
+            PresentCount = attendance.Count(a => a.InTime != null),
+            AbsentCount = attendance.Count(a => a.InTime == null)
+        };
+    }
+
+
+
 
 }

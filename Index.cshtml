@@ -2,7 +2,7 @@
 @model Students_Portal_App.ViewModels.IndexViewModel
 
 @{
-    ViewData["Title"] = "Staff Dashboard";
+    ViewData["Title"] = "ADMIN Dashboard";
     var attendance = Model.AttendanceSummary;
     var totalStudents = Model.TotalStudents;
 }
@@ -41,7 +41,6 @@
 
 <div class="row mb-4">
 
-    <!-- Students Status Chart -->
     <div class="col-md-6">
         <h5>ADMIN DASHBOARD</h5>
         <div class="card card-box p-4">
@@ -73,7 +72,6 @@
         </div>
     </div>
 
-    <!-- Department Strength Chart -->
     <div class="col-md-6">
         <div class="card card-box p-4">
             <h5>Department Status</h5>
@@ -87,7 +85,6 @@
     </div>
 </div>
 
-<!-- Students List Table -->
 <div class="card card-box p-4">
     <div class="d-flex justify-content-between mb-3 flex-wrap gap-2">
         <h5>Students List</h5>
@@ -140,7 +137,6 @@
     </table>
 </div>
 
-<!-- Attendance Modals -->
 @foreach (var student in Model.StudentsAttendance)
 {
     <div class="modal fade" id="attendanceModal-@student.StudentId" tabindex="-1">
@@ -151,16 +147,19 @@
                         <h5 class="modal-title">Mark Attendance - @student.StudentName - @DateTime.Today:yyyy-MM-dd</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
+
                     <div class="modal-body">
                         <label>In Time</label>
                         <input type="time" name="inTime" class="form-control mb-2" value="@student.InTime?.ToString("HH:mm")" />
                         <label>Out Time</label>
                         <input type="time" name="outTime" class="form-control" value="@student.OutTime?.ToString("HH:mm")" />
                     </div>
+
                     <div class="modal-footer">
                         <button type="submit" class="btn btn-success">Save Attendance</button>
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     </div>
+                    
                 </form>
             </div>
         </div>
@@ -189,6 +188,7 @@
                         <span>${labels[i]}: ${count}</span>
                         <i class="fas fa-info-circle ms-2" data-bs-toggle="popover" data-bs-html="true"></i>
                     </div>
+
                 `);
                 el.find("i").attr("data-bs-content", studentNames.length ? studentNames.join("<br>") : `Total: ${count}`);
                 container.append(el);
@@ -204,12 +204,12 @@
 
                     // Decide Today or Monthly counts
                     const counts = currentType === "monthly"
-                        ? [res.MonthlyActiveCount, res.MonthlyInactiveCount]
-                        : [res.ActiveCount, res.InactiveCount];
+                        ? [res.monthlyActiveCount, res.monthlyInactiveCount]
+                        : [res.activeCount, res.inactiveCount];
 
                     const names = currentType === "monthly"
-                        ? [res.MonthlyActiveNames, res.MonthlyInactiveNames]
-                        : [res.ActiveNames, res.InactiveNames];
+                        ? [res.monthlyActiveNames, res.monthlyInactiveNames]
+                        : [res.activeNames, res.inactiveNames];
 
                     const labels = currentType === "monthly"
                         ? ['Present', 'Absent']

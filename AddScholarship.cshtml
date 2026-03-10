@@ -1,0 +1,75 @@
+﻿@model Students_Portal_App.ViewModels.AddScholarshipViewModel
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+<div class="container mt-5">
+    <div class="card shadow-sm rounded-3 p-4 mx-auto" style="max-width: 600px;">
+        <h3 class="mb-4 text-center">Add Scholarship</h3>
+
+        <form asp-controller="Scholarship" asp-action="AddScholarship" method="post">
+
+            <div class="mb-3">
+                <label asp-for="RegisterNumber" class="form-label">Register Number</label>
+                <input asp-for="RegisterNumber" class="form-control" placeholder="Enter Register Number" />
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="ScholarshipName" class="form-label">Scholarship Name</label>
+                <input asp-for="ScholarshipName" class="form-control" placeholder="Enter Scholarship Name" />
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Amount" class="form-label">Amount</label>
+                <input asp-for="Amount" type="number" class="form-control" placeholder="Enter Amount" />
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Dob" class="form-label">Date of Birth</label>
+                <input asp-for="Dob" type="date" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="ScholarshipYear" class="form-label">Year</label>
+                <input asp-for="ScholarshipYear" type="number" class="form-control" placeholder="Enter Year" />
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Country" class="form-label">Country</label>
+                <input asp-for="Country" class="form-control" placeholder="Enter Country" />
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="State" class="form-label">State</label>
+                <input asp-for="State" class="form-control" placeholder="Enter State" />
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="District" class="form-label">District</label>
+                <input asp-for="District" class="form-control" placeholder="Enter District" />
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Status" class="form-label">Status</label>
+                <select asp-for="Status" class="form-select">
+                    <option>Pending</option>
+                    <option>Approved</option>
+                    <option>Rejected</option>
+                </select>
+            </div>
+
+            <div class="d-grid mt-4">
+                <button type="submit" class="btn btn-primary btn-lg">Save Scholarship</button>
+            </div>
+
+        </form>
+
+        @if (TempData["Success"] != null)
+        {
+            <div class="alert alert-success mt-3" role="alert">
+                @TempData["Success"]
+            </div>
+        }
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
